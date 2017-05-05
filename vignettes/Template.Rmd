@@ -1,0 +1,10 @@
+---
+title: "Vignette Title"
+author: "Vignette Author"
+date: "June 19 - 20, 2017"
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document
+---

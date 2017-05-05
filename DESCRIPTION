@@ -13,6 +13,8 @@ Description: This package contains training material for advanced R
     and Bioconductor courses. Each course is git branch; the README
     file links to the github-based source repository.
 Depends: R (>= 3.4.0)
+Suggests: BiocStyle, knitr, rmarkdown
+VignetteBuilder: knitr
 License: Artistic-2.0
 Encoding: UTF-8
 RoxygenNote: 6.0.1
