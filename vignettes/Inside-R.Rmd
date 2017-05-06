@@ -1,0 +1,65 @@
+---
+title: "Inside the mind of _R_"
+author: "Martin Morgan, Herve Pages"
+date: "June 19 - 20, 2017"
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document
+---
+
+# _R_ as we know it
+
+## Memory management
+
+Copy on change
+
+Garbage collection
+
+Performance consequences
+
+## Symbol resolution and evaluation
+
+Environments
+
+Lexical scope
+
+Evaluation, lazy and non-standard evaluation
+
+## Practical techniques
+
+Correctness
+
+Performance
+
+Debugging beyond `debug()`
+
+# Finding the inner _R_: the C API and implementation
+
+## Behind the curtain
+
+From _R_ to C
+
+S-expressions
+
+The public API
+
+## Old-school approaches to foreign langauges
+
+When to worry?
+
+- Access third-party libraries
+- Novel algorithms
+- Simpler reasoning
+- Copy-free operations
+
+`.C()`
+
+`.Call()`
+
+## Rcpp
+
+## Into the weeds
+
+Fun (?!) with `gdb`
