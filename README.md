@@ -2,7 +2,7 @@
 
 Instructors: Martin Morgan, Herve Pages<br />
 Date: June 19-20, 2017<br />
-Location: Zurich
+Location: University of Zurich
 
 Part 1: [Inside the mind of _R_][] (Day 1)
 
