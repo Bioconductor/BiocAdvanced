@@ -11,6 +11,266 @@ output:
 
 # _R_ as we know it
 
+## Symbol resolution and evaluation
+
+Environments
+
+- Current environment
+
+    ```{r}
+    environment()
+    ```
+
+- surprisingly central to _R_
+
+    ```{r}
+    env <- new.env()
+    env[["foo"]] <- 123
+    env[["foo"]]
+    get("foo", env)      # equivalent (not really!)
+    ls(env)
+    ```
+
+- hash table of key-value pairs
+  - Key is called a `name` or `symbol` in _R_
+  - constant-time lookup
+
+- 'reference' semantics (almost all else in _R_ is 'copy-on-change' semantics)
+
+    ```{r}
+    another <- env
+    env[["bar"]] <- 456
+    another[["bar"]]
+    ```
+- All environments have a 'parent' environment
+
+    ```{r}
+    parent.env(env)
+    ```
+
+    - special environment: `emptyenv()`
+    - parent environment is set during construction (argument to `new.env()`)
+    
+- Environment can be chained together as a linked list
+
+    ```{r}
+    top <- new.env(parent = emptyenv())
+    mid <- new.env(parent = top)
+    bot <- new.env(parent = mid)
+    ```
+
+- Symbol (key) look-up
+
+    ```{r}
+    top[["top"]] <- 1
+    mid[["mid"]] <- 2
+    bot[["bot"]] <- 3
+    ```
+
+- Symbols not found in the reference enviroment are looked for in the
+  parent environment
+  
+    ```{r}
+    get("bot", bot)
+    get("mid", bot)
+    tryCatch({
+        get("mid", bot, inherits=FALSE) # restricts search to current env
+    }, error = conditionMessage)
+    bot[["mid"]]                        # NULL; `[[` restricts to current env
+    ```
+   
+- Assignment is to the current environment
+
+    ```{r}
+    bot[["mid"]] <- 5
+    bot[["mid"]]
+    mid[["mid"]]
+    ```
+    
+- Functions are intimately connected to environments
+
+    ```{r}
+    fun <- function() {
+        environment()
+    }
+    fun()              # an environment defines the body of a function
+    fun()              # new function, so new environment
+    ```
+
+- What happens to the environment in a function?
+
+    - garbage collection (later!) when no longer referenced
+    
+- If a function body has an environment, there must be a parent environment
+
+    ```{r}
+    fun <- function() {
+        env <- environment()
+        list(env, parent.env(env))
+    }
+    fun()
+    ```
+    
+    - Is the parent of the environment of a function the environment
+      in which the function was _called from_, or the environment in
+      which the function was _defined_?
+
+    ```{r}
+    fun <- function() {
+        fun1 <- function() {
+            env1 <- environment()    # envrionment created by fun1
+            par1 <- parent.env(env1) # parent environment
+            list(env1 = env1, par1 = par1)
+        }
+        env <- environment()        # environment created by fun
+        par <- parent.env(env)
+        list(env = env, par = par, fun1=fun1)
+    }
+    fun()
+    ```
+
+    - The parent of a function's environment is the environment _in
+      which it was defined_ (different from the environment from which
+      it was called)
+      
+    - Lookup, assignment (`<-`) and assignment to the parent(s)
+      environment (`<<-`)
+    
+    ```{r}
+    fun = function() {
+        x0 <- 0
+        x1 <- 0
+        fun1 <- function() {
+            y <- 1     # create local variable y
+            x1 <<- 2   # assign to first occurrence of 'x' in parent env(s)
+            z <<- 3    # no z in parent env(s), so created in top env
+            c(x0 = x0, x1 = x1, y = y, z = z)
+        }
+        
+        result <- fun1()
+        list(x0 = x0, x1 = x1, result = result)
+    }
+    ```
+        
+- This is called **[lexical scope][]**
+
+[lexical scope]: https://www.stat.auckland.ac.nz/~ihaka/downloads/lexical.pdf
+
+- When is lexical scope used?
+
+***An extended example: bank account***
+
+- Congratulations, you own a bank! Here's a function that creates an
+  account, and provides access to it
+
+    ```{r}
+    account <- function() {
+       balance <- 0
+    
+       available <- function() {
+       }
+    
+       deposit <- function(amt) {
+       }
+    
+       withdraw <- function(amt) {
+       }
+    
+       list(available = available, deposit = deposit, withdraw = withdraw)
+    }
+    ```
+
+<!--
+    ```{r}
+    account <- function() {
+       balance <- 0
+    
+       available <- function() {
+           balance
+       }
+    
+       deposit <- function(amt) {
+           balance <<- balance + amt
+           balance
+       }
+    
+       withdraw <- function(amt) {
+           if (amt > balance)
+               stop("insufficient funds")
+           deposit(-amt)
+       }
+    
+       list(available = available, deposit = deposit, withdraw = withdraw)
+    }
+    ```
+-->
+    
+- Implement for the following test case, using the concept of lexical scope:
+
+    ```{r}
+    library(testthat)
+    test_that("I understand lexical scope", {
+        acct1 <- account()
+        expect_equal(acct1$deposit(10), 10)
+        expect_equal(acct1$deposit(12), 22)
+        expect_equal(acct1$available(), 22)
+        expect_equal(acct1$withdraw(20), 2)
+        expect_error(acct1$withdraw(20), "insufficient funds")
+    })
+    ```
+    
+- What happens when you get a second customer?
+
+    ```{r}
+    test_that("functions create local scope", {
+        acct1 <- account(); acct1$deposit(10)
+        acct2 <- account(); acct2$deposit(20)
+        expect_equal(acct1$available(), 10)
+        expect_equal(acct2$available(), 20)
+    })
+    ```
+- What changes to implementation would be require to allow
+
+<!--
+    ```{r}
+    account <- function() {
+       balance <- 0
+    
+       available <- function() {
+           balance
+       }
+    
+       deposit <- function(amt) {
+           balance <<- balance + amt
+           funs
+       }
+    
+       withdraw <- function(amt) {
+           if (amt > balance)
+               stop("insufficient funds")
+           deposit(-amt)
+       }
+    
+       funs = list(
+           available = available, deposit = deposit, withdraw = withdraw
+       )
+       
+       funs
+    }
+    ```
+-->
+
+    ```{r, eval=FALSE}
+    test_that("endomorphisms rock", {
+        expect_equal(account()$deposit(10)$withdraw(5)$available(), 5)
+    })
+    ```
+    
+Functions, package namespace, `search()`
+
+Evaluation, lazy and non-standard evaluation
+
+
 ## Memory management
 
 Copy on change
@@ -18,14 +278,6 @@ Copy on change
 Garbage collection
 
 Performance consequences
-
-## Symbol resolution and evaluation
-
-Environments
-
-Lexical scope
-
-Evaluation, lazy and non-standard evaluation
 
 ## Practical techniques
 
