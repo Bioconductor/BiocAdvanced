@@ -229,7 +229,6 @@ Environments
         expect_equal(acct2$available(), 20)
     })
     ```
-- What changes to implementation would be require to allow
 
 <!--
     ```{r}
@@ -260,7 +259,9 @@ Environments
     ```
 -->
 
-    ```{r, eval=FALSE}
+- What changes to implementation would be require to allow
+
+    ```{r}
     test_that("endomorphisms rock", {
         expect_equal(account()$deposit(10)$withdraw(5)$available(), 5)
     })
