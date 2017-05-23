@@ -4,6 +4,8 @@ Instructors: Martin Morgan, Herve Pages<br />
 Date: June 19-20, 2017<br />
 Location: University of Zurich
 
+- [Preparation][] (Optional)
+
 Part 1: [Inside the mind of _R_][] (Day 1)
 
 - _R_ as we know it -- why it behaves the way it does
@@ -18,6 +20,7 @@ Part 3: [Doing it better][] (Day 2)
 
 - Directions in _R_ and software development
 
+[Preparation]: vignettes/Preparation.Rmd
 [Inside the mind of _R_]: vignettes/Inside-R.Rmd
 [Nouns and verbs]: vignettes/Classes-and-methods.Rmd
 [Doing it better]: vignettes/Better.Rmd

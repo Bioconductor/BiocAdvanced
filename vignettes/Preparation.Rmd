@@ -1,0 +1,89 @@
+---
+title: "Preparation"
+author: "Martin Morgan, Herve Pages"
+date: "June 19 - 20, 2017"
+vignette: >
+  %\VignetteIndexEntry{Preparation}
+  %\VignetteEngine{knitr::rmarkdown}
+output:
+  BiocStyle::html_document
+---
+
+# Preparation
+
+## (Recommended but optional) Build R from Source
+
+- It will be helpful, but not required, to have your own _R_, built
+  from source 'by hand'. We'll use it when learning about _R_'s memory
+  managment, and when debugging _C_ code.
+
+SVN
+
+- Use SVN to check out the 'R-3-4-branch' source code. The specific
+  location is not so important, but I like to have a 'src' and 'bin'
+  user directory. This requires that subversion is installed.
+
+    ```
+    mkdir -p ~/src/ && cd ~/src
+    svn co https://svn.r-project.org/R/branches/R-3-4-branch
+    ```
+
+Linux
+
+- Requires admin rights if the 'devel' version of system libraries
+  need to be installed.
+
+- (an easy cheat -- get dependencies by using your package manager to
+  install a 'dev' version of current _R_, e.g., `sudo apt-get install r-base-dev`).
+  But then do the svn stuff anyway.
+
+- I do an SVN checkout into a 'source' directory, then build in a
+  'bin' directory. I build without optimization (for easy debugging)
+
+    ```
+    mkdir -p ~/src/ && cd ~/src
+    svn co https://svn.r-project.org/R/branches/R-3-4-branch
+    R-3-4-branch/tools/rsync-recommended
+    mkdir -p ~/bin/R-3-4-branch
+    cd ~/bin/R-3-4-branch
+    CFLAGS="-g -O0" CXXFLAGS="-g -O0" ~/src/R-3-4-branch/configure \
+        --enable-R-shlib --enable-memory-profiling
+    make -j
+    ```
+
+- Use the built version in-place (no need to install) `~/bin/R-3-4-branch/bin/R`
+
+
+Mac (requires admin rights)
+
+- Complete instructions for [building from source][mac-src-build].
+
+[mac-src-build]: https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Installing-R-under-macOS
+
+Windows
+
+- Complete instructions for [building from source][windows-src-build].
+- Avoid spaces in file paths.
+- Install [svn command-line client][windows-svn].
+- Open a PowerShell or cmd shell. Check out the R-3-4-0-branch of svn,
+  as above.
+- Install [Rtools][]; install everything; when asked for the _R_
+  source location, point to the svn checked-out
+  location. [Set the PATH environment variable][windows-setenv] to
+  include the installed location of `Rtools/bin` to your PATH.
+- Install MikTeX
+- Build _R_ in the source directory
+
+    ```
+    cd R-3-4-branch/src/gnuwin32
+    cp MkRules.dist MkRules.local
+    make rsync-extsoft
+    make -j
+    ```
+
+- Use your version of R, e.g., `../../bin/i386/Rgui.exe`
+
+[windows-setenv]:  http://www.dowdandassociates.com/blog/content/howto-set-an-environment-variable-in-windows-gui/
+[windows-svn]: https://stackoverflow.com/questions/2341134/command-line-svn-for-windows
+[Rtools]: https://cran.r-project.org/bin/windows/Rtools/
+[windows-src-build]: https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Building-from-source
