@@ -5,11 +5,74 @@ date: "June 19 - 20, 2017"
 vignette: >
   %\VignetteIndexEntry{Vignette Title}
   %\VignetteEngine{knitr::rmarkdown}
-output: 
+output:
   BiocStyle::html_document
 ---
 
 # _R_ as we know it
+
+## Preparation (recommended): build R from Source
+
+- It will be helpful, but not required, to have your own _R_, built
+  from source 'by hand'.
+- Use SVN to check out the 'R-3-4-branch' source code
+
+Linux (requires admin rights)
+
+- (an easy cheat -- get dependencies by using your package manager to
+  install a 'dev' version of current _R_, e.g., `sudo apt-get install r-base-dev`).
+  But then do the svn stuff anyway.
+
+- I do an SVN checkout into a 'source' directory, then build in a
+  'bin' directory. I build without optimization (for easy debugging)
+
+    ```
+    mkdir -p ~/src/ && cd ~/src
+    svn co https://svn.r-project.org/R/branches/R-3-4-branch
+    R-3-4-branch/tools/rsync-recommended
+    mkdir -p ~/bin/R-3-4-branch
+    cd ~/bin/R-3-4-branch
+    CFLAGS="-g -O0" CXXFLAGS="-g -O0" ~/src/R-3-4-branch/configure \
+        --enable-R-shlib --enable-memory-profiling
+    make -j
+    ```
+
+- Use the built version in-place (no need to install) `~/bin/R-3-4-branch/bin/R`
+
+
+Mac (requires admin rights)
+
+- Complete instructions for [building from source][mac-src-build].
+
+[mac-src-build]: https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Installing-R-under-macOS
+
+Windows
+
+- Complete instructions for [building from source][windows-src-build].
+- Avoid spaces in file paths.
+- Install [svn command-line client][windows-svn].
+- Open a PowerShell or cmd shell. Check out the R-3-4-0-branch of svn,
+  as above.
+- Install [Rtools][]; install everything; when asked for the _R_
+  source location, point to the svn checked-out
+  location. [Set the PATH environment variable][windows-setenv] to
+  include the installed location of `Rtools/bin` to your PATH.
+- Install MikTeX
+- Build _R_ in the source directory
+
+    ```
+    cd R-3-4-branch/src/gnuwin32
+    cp MkRules.dist MkRules.local
+    make rsync-extsoft
+    make -j
+    ```
+
+- Use your version of R, e.g., `../../bin/i386/Rgui.exe`
+
+[windows-setenv]:  http://www.dowdandassociates.com/blog/content/howto-set-an-environment-variable-in-windows-gui/
+[windows-svn]: https://stackoverflow.com/questions/2341134/command-line-svn-for-windows
+[Rtools]: https://cran.r-project.org/bin/windows/Rtools/
+[windows-src-build]: https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Building-from-source
 
 ## Symbol resolution and evaluation
 
@@ -50,7 +113,7 @@ Environments
 
     - special environment: `emptyenv()`
     - parent environment is set during construction (argument to `new.env()`)
-    
+
 - Environment can be chained together as a linked list
 
     ```{r}
@@ -69,7 +132,7 @@ Environments
 
 - Symbols not found in the reference enviroment are looked for in the
   parent environment
-  
+
     ```{r}
     get("bot", bot)
     get("mid", bot)
@@ -78,7 +141,7 @@ Environments
     }, error = conditionMessage)
     bot[["mid"]]                        # NULL; `[[` restricts to current env
     ```
-   
+
 - Assignment is to the current environment
 
     ```{r}
@@ -86,7 +149,7 @@ Environments
     bot[["mid"]]
     mid[["mid"]]
     ```
-    
+
 - Functions are intimately connected to environments
 
     ```{r}
@@ -100,7 +163,7 @@ Environments
 - What happens to the environment in a function?
 
     - garbage collection (later!) when no longer referenced
-    
+
 - If a function body has an environment, there must be a parent environment
 
     ```{r}
@@ -110,7 +173,7 @@ Environments
     }
     fun()
     ```
-    
+
     - Is the parent of the environment of a function the environment
       in which the function was _called from_, or the environment in
       which the function was _defined_?
@@ -132,10 +195,10 @@ Environments
     - The parent of a function's environment is the environment _in
       which it was defined_ (different from the environment from which
       it was called)
-      
+
     - Lookup, assignment (`<-`) and assignment to the parent(s)
       environment (`<<-`)
-    
+
     ```{r}
     fun = function() {
         x0 <- 0
@@ -146,19 +209,58 @@ Environments
             z <<- 3    # no z in parent env(s), so created in top env
             c(x0 = x0, x1 = x1, y = y, z = z)
         }
-        
+
         result <- fun1()
         list(x0 = x0, x1 = x1, result = result)
     }
     ```
-        
+
 - This is called **[lexical scope][]**
 
 [lexical scope]: https://www.stat.auckland.ac.nz/~ihaka/downloads/lexical.pdf
 
 - When is lexical scope used?
 
-***An extended example: bank account***
+
+Package namespaces, imports, and `search()`
+
+- The `search() path
+
+    ```{r}
+    search()
+    ```
+
+- `library(BiocGenerics)`: loading and attaching a package
+
+    1. Package NAMESPACE is _loaded_ into the current _R_ session
+
+    2. An environment containing exported symbols from the package is
+       _attached_ to the _R_ search path
+
+- 'Attaching' a package means that the `.GlobalEnv`'s parent points to
+   the new package exported symbol environment. The new package
+   exported symbol environment points to the package previously
+   pointed to by `.GlobalEnv`
+
+- A package consists of a NAMESPACE
+
+    - A NAMESPACE is an environment
+    - The parent of the NAMESPACE is an environment containing imported symbols
+    - The parent of the environment with imported symbols is the base environment
+    - PAUSE
+    - The parent of the base environment is the .GlobalEnv
+    - ...and so on down the search path
+
+- Symbol resolution in packages follows lexical scope
+
+    - Resolved in the function, then package NAMESPACE, then imports
+      environment, then base then .GlobalEnv, then ...
+
+Evaluation, lazy and non-standard evaluation
+
+### Exercises
+
+***Exercise:*** bank account
 
 - Congratulations, you own a bank! Here's a function that creates an
   account, and provides access to it
@@ -166,16 +268,13 @@ Environments
     ```{r}
     account <- function() {
        balance <- 0
-    
-       available <- function() {
-       }
-    
-       deposit <- function(amt) {
-       }
-    
-       withdraw <- function(amt) {
-       }
-    
+
+       available <- function() {}
+
+       deposit <- function(amt) {}
+
+       withdraw <- function(amt) {}
+
        list(available = available, deposit = deposit, withdraw = withdraw)
     }
     ```
@@ -184,27 +283,27 @@ Environments
     ```{r}
     account <- function() {
        balance <- 0
-    
+
        available <- function() {
            balance
        }
-    
+
        deposit <- function(amt) {
            balance <<- balance + amt
            balance
        }
-    
+
        withdraw <- function(amt) {
            if (amt > balance)
                stop("insufficient funds")
            deposit(-amt)
        }
-    
+
        list(available = available, deposit = deposit, withdraw = withdraw)
     }
     ```
 -->
-    
+
 - Implement for the following test case, using the concept of lexical scope:
 
     ```{r}
@@ -218,7 +317,7 @@ Environments
         expect_error(acct1$withdraw(20), "insufficient funds")
     })
     ```
-    
+
 - What happens when you get a second customer?
 
     ```{r}
@@ -234,30 +333,32 @@ Environments
     ```{r}
     account <- function() {
        balance <- 0
-    
+
        available <- function() {
            balance
        }
-    
+
        deposit <- function(amt) {
            balance <<- balance + amt
            funs
        }
-    
+
        withdraw <- function(amt) {
            if (amt > balance)
                stop("insufficient funds")
            deposit(-amt)
        }
-    
+
        funs = list(
            available = available, deposit = deposit, withdraw = withdraw
        )
-       
+
        funs
     }
     ```
 -->
+
+***Exercise:*** bank account 2
 
 - What changes to implementation would be require to allow
 
@@ -266,11 +367,62 @@ Environments
         expect_equal(account()$deposit(10)$withdraw(5)$available(), 5)
     })
     ```
-    
-Functions, package namespace, `search()`
 
-Evaluation, lazy and non-standard evaluation
+***Exercise:*** package-local options
 
+- Implement 'package-local' options that the user can set via
+  functions. Do this by using `local()` to create and populate an
+  environment that contains the package-local variables as well as
+  accessor functions `get()` and `set()` to retrieve / assign
+  variables, e.g., `tolerance`. Here's a start, and some unit tests
+
+    ```{r}
+    .myoptions <- local({
+        tolerance = 1e-4
+
+        get = function() {
+            tolerance
+        }
+
+        set = function(value) {
+        }
+
+        ## ...
+    })
+
+    ## setTolerance = ...
+    ```
+
+<!--
+    ```{r}
+    .myoptions <- local({
+        tolerance = 1e-4
+        get = function() tolerance
+        list(
+            get = get,
+            set = function(value) {
+                ovalue <- get()
+                tolerance <<- value
+                ovalue
+            }
+        )
+    })
+
+    getTolerance <- .myoptions$get
+    setTolerance <- .myoptions$set
+    ```
+-->
+
+- Here are some unit tests
+
+    ```{r}
+    test_that("local options can be set", {
+        expect_equal(getTolerance(), 1e-4)
+        ## setTolerance() returns previous value, to ease resetting
+        expect_equal(otol <- setTolerance(1e-5), 1e-4)
+        expect_equal(setTolerance(otol), 1e-5)
+    })
+    ```
 
 ## Memory management
 
