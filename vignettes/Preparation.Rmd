@@ -59,6 +59,7 @@ Mac (requires admin rights)
 - Complete instructions for [building from source][mac-src-build].
 
 [mac-src-build]: https://cran.r-project.org/doc/manuals/r-release/R-admin.html#Installing-R-under-macOS
+[mac-src-build-nitesh]: https://gist.github.com/anonymous/862412bfb2b8fbc5a88a72c981dfe6db
 
 Windows
 
