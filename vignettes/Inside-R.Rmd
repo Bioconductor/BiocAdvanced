@@ -468,7 +468,7 @@ Garbage collection (approximate description)
   [memory.c][].
 
 [gc-notes]: http://homepage.stat.uiowa.edu/~luke/R/gengcnotes.html
-[R-ints]: https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-write-barrier
+[R-ints-gc]: https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-write-barrier
 [memory.c]: https://github.com/wch/r-source/blob/trunk/src/main/memory.c
 
 Performance consequences
