@@ -25,7 +25,7 @@ Copy on change
     x
     y
     ```
-    
+
     ```{r}
     x <- 1:5
     fun = function(z) { z[1] = 2L; z }
@@ -48,20 +48,20 @@ Copy on change
     x = 1:5
     .Internal(inspect(x))
     ```
-    
+
     - `@41de7d8`: memory address.
     - `13 INTSXP`: integer 'S-expression' (more later).
     - `[NAM(1)]`: One symbol (`x`) references the location in memory.
-    
+
     ```{r}
     x = y = 1:5
     .Internal(inspect(x))
     .Internal(inspect(y))
     ```
-    
+
     - `x`, `y` point to same location in memory
     - `[NAM(2)]`: (at least) two symbols reference the location
-    
+
 - 'Copy-on-change': when updating a vector, make a copy if `NAM() == 2`.
 
     ```{r}
@@ -71,7 +71,7 @@ Copy on change
     x[1] = 2L
     .Internal(inspect(x))
     .Internal(inspect(y))
-    
+
     ## no copy necessary
     x = 1:5
     .Internal(inspect(x))
@@ -123,13 +123,194 @@ Garbage collection (approximate description)
 
 Performance consequences
 
-## Practical techniques
+- Allocation and copying are comparatively expensive
+- Some common use patterns involve a lot of copying!
 
-Correctness
+    - `c()`, `rbind()`, `cbind()` in a loop
+    - Modifying a `data.frame()`, `list()`, or S4 object.
 
-Performance
+### Exercises
 
-Debugging beyond `debug()`
+Use `.Internal(inspect())` to follow memory allocated to `x` in the
+following loop.
+
+```{r}
+x <- integer()
+n <- 5
+for (i in 1:n)
+    x <- c(x, i)
+```
+
+<!--
+```{r, eval = FALSE}
+x = 1L; .Internal(inspect(x))
+for (i in 1:n) {
+    x <- c(x, i)
+    .Internal(inspect(x))
+}
+```
+-->
+
+- If an integer occupies about 8 bytes of memory, and each iteration
+  in the loop copies the current allocation into the new allocation,
+  how many bytes are copied in a loop with `n` iterations?
+
+- Interpret the output of `tracemem()` for memory allocations when
+  updating a value in a `data.frame()`. How much of the `data.frame`
+  is being copied?
+
+    ```{r}
+    df <- mtcars
+    tracemem(df)        # The overall data.frame
+    tracemem(df[[1]])   # The specific column
+    df[1, 1]
+    df[1, 1] = 22.1
+    df[2, 2] = 22.2
+    ```
+
+- Compare this to memory allocations when modifying a similarly sized matrix
+
+    ```{r}
+    m <- m1 <- matrix(0, nrow(mtcars), ncol(mtcars))
+    tracemem(m)         # A matrix is a vector with dims attributes
+    m[1, 1] = 22.1
+    m[2, 1] = 22.2
+    ```
+
+-  And to a 'vectorized' update
+
+    ```{r}
+    df <- mtcars
+    tracemem(df); tracemem(df[[1]])
+    df[1:2, 1] <- c(22.1, 22.2)
+
+    m <- m1 <- matrix(0, nrow(mtcars), ncol(mtcars))
+    tracemem(m)         # A matrix is a vector with dims attributes
+    m[1:2, 1] <- c(22.1, 22.2)
+    ```
+
+## Correct, robust, fast: practical techniques
+
+Here's a simple function, implemented poorly
+
+```{r}
+f <- function(n) {
+    x <- integer()
+    for (i in 1:n)
+        x <- c(x, i)
+    x
+}
+```
+
+Correct
+
+- Most important!
+- `identical()` -- very strict
+- `all.equal()` -- allows for numerical approximation
+- Unit tests!
+
+    ```{r}
+    library(testthat)
+    test_that("f() is correct", {
+        expect_identical(f(5), 1:5)
+    })
+    ```
+
+Robust
+
+- Edge cases, e.g., length 0 iterations, `NA` values, ... Here we add
+  some additional tests, and put them in a function for easy reuse.
+
+    ```{r}
+    tests <- function(f) {
+        test_that("f() is correct", {
+            expect_identical(f(5), 1:5)
+            expect_identical(f(1), 1L)
+            expect_identical(f(0), integer(0))
+        })
+    }
+    ```
+
+- Our code fails the unit tests, because `1:n` fails with `n == 0`
+
+    ```{r}
+    tryCatch(tests(f), error = conditionMessage)
+    ```
+
+- Revised code, robust to common use case
+
+    ```{r}
+    f1 = function(n) {
+        x <- integer()
+        for (i in seq_len(n))
+            x = c(x, i)
+        x
+    }
+    tests(f1)
+    ```
+
+Fast
+
+- `system.time()`, but can be considerable run-to-run variation
+- [microbenchmark][]
+
+    ```{r}
+    library(microbenchmark)
+    res <- microbenchmark(f1(100), f1(200), f1(400), f1(800), f1(1600))
+    plot(res)
+    ```
+
+- Scales quadratically, because of copying. Solutions?
+
+    ```{r, eval=FALSE}
+    f2 <- function(n) {
+        sapply(seq_len(n), function(i) i)
+    }
+    tests(f2)  # fails! n == 0
+    ```
+
+    ```{r, eval=FALSE}
+    f2a <- function(n) {
+        if (n == 0) {
+            integer()
+        } else {
+            sapply(seq_len(n), function(i) i)
+        }
+    }
+    tests(f2a)
+    ```
+
+    ```{r, eval=FALSE}
+    f3 <- function(n) {
+        vapply(seq_len(n), function(i) i, integer(1))
+    }
+    test_that("f() is correct", {
+        expect_identical(f3(5), 1:5)
+        expect_identical(f3(1), 1L)
+        expect_identical(f3(0), integer(0))
+    })
+    tests(f3)
+    ```
+
+    ```{r, eval=FALSE}
+    f4 <- function(n) {
+        x <- integer(n)
+        for (i in seq_len(n))
+            x[[i]] = i
+        x
+    }
+    tests(f4)
+    ```
+
+    ```{r, eval=FALSE}
+    f5 <- seq_len
+    tests(f5)
+    ```
+
+    ```{r, eval=FALSE}
+    n <- 1000
+    microbenchmark(f1(n), f2a(n), f3(n), f4(n), f5(n))
+    ```
 
 ## Symbol resolution and evaluation
 
@@ -301,17 +482,18 @@ Package namespaces, imports, and `search()`
 
 - A package consists of a NAMESPACE
 
-    - A NAMESPACE is an environment
-    - The parent of the NAMESPACE is an environment containing imported symbols
-    - The parent of the environment with imported symbols is the base environment
-    - PAUSE
-    - The parent of the base environment is the .GlobalEnv
-    - ...and so on down the search path
+    - A NAMESPACE is an environment.
+    - The parent of the NAMESPACE is an environment containing
+      imported symbols.
+    - The parent of the environment with imported symbols is the base
+      environment.
+    - The parent of the base environment is the `.GlobalEnv`.
+    - ...and so on down the search path.
 
 - Symbol resolution in packages follows lexical scope
 
     - Resolved in the function, then package NAMESPACE, then imports
-      environment, then base then .GlobalEnv, then ...
+      environment, then base then `.GlobalEnv`, then ...
 
 Evaluation, lazy and non-standard evaluation
 
@@ -481,6 +663,14 @@ Evaluation, lazy and non-standard evaluation
     })
     ```
 
+## Debugging
+
+- `browser()`
+- `debug()`, `debugonce()`
+- `trace()` -- especially useful for S4 methods (argument
+  `signature=`), and for tracing execution (e.g.,
+  `tracer = quote(print(argname))`)
+
 # Finding the inner _R_: the C API and implementation
 
 ## Behind the curtain
@@ -504,10 +694,9 @@ When to worry?
 
 `.Call()`
 
-### Example: mutex
+### Example: uuid
 
-- mutex: 'mutual exclusion' lock
-- par
+- uuid: globally unique id.
 
 ## Rcpp
 
