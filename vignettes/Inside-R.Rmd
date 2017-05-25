@@ -11,6 +11,126 @@ output:
 
 # _R_ as we know it
 
+## Memory management
+
+Copy on change
+
+- It seems like _R_ variables do not share any memory
+
+    ```{r}
+    x <- y <- 1:5
+    x
+    y
+    x[1] <- 2L
+    x
+    y
+    ```
+    
+    ```{r}
+    x <- 1:5
+    fun = function(z) { z[1] = 2L; z }
+    fun(x)
+    x
+    ```
+
+    - Different from many programming languages
+    - Very convenient for users -- they don't have to think about
+      'change-at-a-distance'.
+- _R_ uses a 'named' concept, rather than strict 'reference counting'
+
+    - Counts the number of references to a location in memory...
+    - But can only count to 2
+    - So '2' means that at some point in the memory location's
+      history, 2 _or more_ symbols referenced that location.
+- In action
+
+    ```{r}
+    x = 1:5
+    .Internal(inspect(x))
+    ```
+    
+    - `@41de7d8`: memory address.
+    - `13 INTSXP`: integer 'S-expression' (more later).
+    - `[NAM(1)]`: One symbol (`x`) references the location in memory.
+    
+    ```{r}
+    x = y = 1:5
+    .Internal(inspect(x))
+    .Internal(inspect(y))
+    ```
+    
+    - `x`, `y` point to same location in memory
+    - `[NAM(2)]`: (at least) two symbols reference the location
+    
+- 'Copy-on-change': when updating a vector, make a copy if `NAM() == 2`.
+
+    ```{r}
+    ## copy on change
+    x = y = 1:5
+    .Internal(inspect(x))
+    x[1] = 2L
+    .Internal(inspect(x))
+    .Internal(inspect(y))
+    
+    ## no copy necessary
+    x = 1:5
+    .Internal(inspect(x))
+    x[1] = 2L
+    .Internal(inspect(x))
+
+    ```
+
+Garbage collection (approximate description)
+
+- S-expressions (`SEXP`) allocated by the system to a pool of
+  available S-expressions
+- `x <- 1` moves the SEXP from allocated to 'in use' pool, level 0
+  (the 0 in `g0c4` of `.Internal(inspect(x))`)
+- After `rm(x)`, a symbol no longer references the SEXP and it is a
+  candidate for re-use.
+- `gc()` (manual, or more typically triggered automatically when _R_
+  runs out of SEXP in the available pool)
+
+    - Visits all SEXP in g0 pool and marks as 'unreferenced'
+    - Visits all symbols in use and marks their SEXP as 'in use'
+    - Visits (second time) all SEXP in g0 pool. Moves unreferenced
+      symbols to the 'available' pool, moves 'in use' to the g1 pool.
+
+- Note: SEXP belong to 'generations' and classes
+
+    ```{r}
+    y = 1
+    fun = function() { x <- 1; 2 }
+    fun(); gc()    # scans x, y; collects x, ages y
+    fun(); gc()    # scans & collects x, does not visit y
+    ```
+
+    - g0 generation are recently allocated, and checked for
+      suitability for garbage collection most frequently -- typically
+      symbols allocated in functions and no longer in scope; ripe for
+      collection.
+    - g1 has survived increasingly many garbage collections -- package
+      or globals symbols that seldom become eligible for collection.
+    - Net effect: g0 nodes enriched for SEXP that can collected.
+
+- Resources: _R_ Internals manual e.g., the
+  [write barrier][R-ints-gc], Luke Tierney's [notes][gc-notes];
+  [memory.c][].
+
+[gc-notes]: http://homepage.stat.uiowa.edu/~luke/R/gengcnotes.html
+[R-ints-gc]: https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-write-barrier
+[memory.c]: https://github.com/wch/r-source/blob/trunk/src/main/memory.c
+
+Performance consequences
+
+## Practical techniques
+
+Correctness
+
+Performance
+
+Debugging beyond `debug()`
+
 ## Symbol resolution and evaluation
 
 Environments
@@ -360,126 +480,6 @@ Evaluation, lazy and non-standard evaluation
         expect_equal(setTolerance(otol), 1e-5)
     })
     ```
-
-## Memory management
-
-Copy on change
-
-- It seems like _R_ variables do not share any memory
-
-    ```{r}
-    x <- y <- 1:5
-    x
-    y
-    x[1] <- 2L
-    x
-    y
-    ```
-    
-    ```{r}
-    x <- 1:5
-    fun = function(z) { z[1] = 2L; z }
-    fun(x)
-    x
-    ```
-
-    - Different from many programming languages
-    - Very convenient for users -- they don't have to think about
-      'change-at-a-distance'.
-- _R_ uses a 'named' concept, rather than strict 'reference counting'
-
-    - Counts the number of references to a location in memory...
-    - But can only count to 2
-    - So '2' means that at some point in the memory location's
-      history, 2 _or more_ symbols referenced that location.
-- In action
-
-    ```{r}
-    x = 1:5
-    .Internal(inspect(x))
-    ```
-    
-    - `@41de7d8`: memory address.
-    - `13 INTSXP`: integer 'S-expression' (more later).
-    - `[NAM(1)]`: One symbol (`x`) references the location in memory.
-    
-    ```{r}
-    x = y = 1:5
-    .Internal(inspect(x))
-    .Internal(inspect(y))
-    ```
-    
-    - `x`, `y` point to same location in memory
-    - `[NAM(2)]`: (at least) two symbols reference the location
-    
-- 'Copy-on-change': when updating a vector, make a copy if `NAM() == 2`.
-
-    ```{r}
-    ## copy on change
-    x = y = 1:5
-    .Internal(inspect(x))
-    x[1] = 2L
-    .Internal(inspect(x))
-    .Internal(inspect(y))
-    
-    ## no copy necessary
-    x = 1:5
-    .Internal(inspect(x))
-    x[1] = 2L
-    .Internal(inspect(x))
-
-    ```
-
-Garbage collection (approximate description)
-
-- S-expressions (`SEXP`) allocated by the system to a pool of
-  available S-expressions
-- `x <- 1` moves the SEXP from allocated to 'in use' pool, level 0
-  (the 0 in `g0c4` of `.Internal(inspect(x))`)
-- After `rm(x)`, a symbol no longer references the SEXP and it is a
-  candidate for re-use.
-- `gc()` (manual, or more typically triggered automatically when _R_
-  runs out of SEXP in the available pool)
-
-    - Visits all SEXP in g0 pool and marks as 'unreferenced'
-    - Visits all symbols in use and marks their SEXP as 'in use'
-    - Visits (second time) all SEXP in g0 pool. Moves unreferenced
-      symbols to the 'available' pool, moves 'in use' to the g1 pool.
-
-- Note: SEXP belong to 'generations' and classes
-
-    ```{r}
-    y = 1
-    fun = function() { x <- 1; 2 }
-    fun(); gc()    # scans x, y; collects x, ages y
-    fun(); gc()    # scans & collects x, does not visit y
-    ```
-
-    - g0 generation are recently allocated, and checked for
-      suitability for garbage collection most frequently -- typically
-      symbols allocated in functions and no longer in scope; ripe for
-      collection.
-    - g1 has survived increasingly many garbage collections -- package
-      or globals symbols that seldom become eligible for collection.
-    - Net effect: g0 nodes enriched for SEXP that can collected.
-
-- Resources: _R_ Internals manual e.g., the
-  [write barrier][R-ints-gc], Luke Tierney's [notes][gc-notes];
-  [memory.c][].
-
-[gc-notes]: http://homepage.stat.uiowa.edu/~luke/R/gengcnotes.html
-[R-ints-gc]: https://cran.r-project.org/doc/manuals/r-devel/R-ints.html#The-write-barrier
-[memory.c]: https://github.com/wch/r-source/blob/trunk/src/main/memory.c
-
-Performance consequences
-
-## Practical techniques
-
-Correctness
-
-Performance
-
-Debugging beyond `debug()`
 
 # Finding the inner _R_: the C API and implementation
 
