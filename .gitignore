@@ -2,3 +2,4 @@
 .RData
 vignettes/*.html
 vignettes/*.R
+Rplots*pdf
