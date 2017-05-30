@@ -718,27 +718,26 @@ g <- function(x) {
   `options(error=NULL)`. Actually, _any_ function accepting 0
   arguments is possible for recover, e.g., `options(error=traceback)`.
 
-      ```{r, eval=FALSE}
-      f(-1)
-      ## Error: all(x >= 0) is not TRUE
-      ## 
-      ## Enter a frame number, or 0 to exit
-      ## 
-      ## 1: f(-1)
-      ## 2: #2: stopifnot(all(x >= 0))
-      ## 
-      ## Selection: 2
-      ## Called from: f(-1)
-      ## Browse[1]> c
-      ## 
-      ## Enter a frame number, or 0 to exit
-      ## 
-      ## 1: f(-1)
-      ## 2: #2: stopifnot(all(x >= 0))
-      ## 
-      ## Selection:
-      ##
-      ```
+    ```{r, eval=FALSE}
+    f(-1)
+    ## Error: all(x >= 0) is not TRUE
+    ## 
+    ## Enter a frame number, or 0 to exit
+    ## 
+    ## 1: f(-1)
+    ## 2: #2: stopifnot(all(x >= 0))
+    ## 
+    ## Selection: 2
+    ## Called from: f(-1)
+    ## Browse[1]> c
+    ## 
+    ## Enter a frame number, or 0 to exit
+    ## 
+    ## 1: f(-1)
+    ## 2: #2: stopifnot(all(x >= 0))
+    ## 
+    ## Selection:
+    ```
 
 - `trace()` -- especially useful for tracing execution (e.g.,
   `tracer = quote(print(argname))`), and for S4 methods (argument
