@@ -665,19 +665,150 @@ Evaluation, lazy and non-standard evaluation
 
 ## Debugging
 
-- `browser()`
-- `debug()`, `debugonce()`
-- `trace()` -- especially useful for S4 methods (argument
-  `signature=`), and for tracing execution (e.g.,
-  `tracer = quote(print(argname))`)
+```{r}
+f <- function(x) {
+    ## ...
+    g()
+}
+
+g <- function(x) {
+    ## ...
+    if (log(x) < 0) {
+        TRUE
+    } else {
+        FALSE
+    }
+}
+```
+
+- Invoke `traceback()` after error.
+
+    ```{r, eval=FALSE}
+    f(-1)
+    traceback()
+    ```
+
+- `debugonce(g)`: enter the 'browser' when the function is invoked.
+  See `?browser` for what can be done. Variant: `debug(g)`
+  ... `undebug(g)`.
+
+    ```{r, eval=FALSE}
+    debugonce(g)
+    f(-1)
+    ## Browser[2]>
+    ## ...
+    ```
+
+- `browser()`. Edit the source code (not very practical for complex or
+  package code)
+
+    ```{r}
+    g <- function(x) {
+        ## ...
+        browser()
+        if (log(x) < 0) {
+            TRUE
+        } else {
+            FALSE
+        }
+    }
+    ```
+
+- `options(error=recover)`. When done,
+  `options(error=NULL)`. Actually, _any_ function accepting 0
+  arguments is possible for recover, e.g., `options(error=traceback)`.
+
+      ```{r, eval=FALSE}
+      f(-1)
+      ## Error: all(x >= 0) is not TRUE
+      ## 
+      ## Enter a frame number, or 0 to exit
+      ## 
+      ## 1: f(-1)
+      ## 2: #2: stopifnot(all(x >= 0))
+      ## 
+      ## Selection: 2
+      ## Called from: f(-1)
+      ## Browse[1]> c
+      ## 
+      ## Enter a frame number, or 0 to exit
+      ## 
+      ## 1: f(-1)
+      ## 2: #2: stopifnot(all(x >= 0))
+      ## 
+      ## Selection:
+      ##
+      ```
+
+- `trace()` -- especially useful for tracing execution (e.g.,
+  `tracer = quote(print(argname))`), and for S4 methods (argument
+  `signature=`)
+
+    ```{r, eval=FALSE}
+    ## like debug
+    trace(g, tracer=browser)
+    f(-1)
+    ```
+
+    ```{r, eval=FALSE}
+    trace(g, quote({ print(x); print(log(x)) }))
+    for (i in runif(1000, -1, 100)) f(i)
+
+    trace(g, quote(if (x < 0) browser()))
+    for (i in runif(1000, -1, 100)) f(i)
+    ```
+
+    ```{r, eval=FALSE}
+    library(GenomicRanges)
+    showMethods("findOverlaps")
+    selectMethod("findOverlaps", c("GRanges", "GRanges"))
+    trace(findOverlaps, browser, signature=c("GenomicRanges", "GenomicRanges"))
+    ```
+
+Found a bug, now what?
+
+- Recover more gracefully. (Somehow not a good solution -- would
+  rather avoid the problem than treat the symptom).
+
+    ```{r, eval=FALSE}
+    g <- function(x) {
+        ## ...
+        tryCatch({
+            if (log(x) < 0)
+                TRUE
+            else
+                FALSE
+        }, error = function(e) {
+           NA
+        })
+    ```
+
+- Program more cleverly / robustly -- in our trivial example, the
+  `if()` is irrelevant, and introduces a cryptic error message!
+
+    ```{r, eval = FALSE}
+    g <- function(x) {
+        ## ...
+        log(x) < 0  # NA, instead of error from if (NA) (!)
+    ```
+
+- Best: assert pre-conditions (and program more cleverly).
+
+    ```{r, eval = FALSE}
+    f <- function(x) {
+        stopifnot(is.numeric(x), length(x) == 1, !is.na(x), x >= 0)
+        ## ...
+        g(x)
+    }
+    ```
 
 # Finding the inner _R_: the C API and implementation
 
 ## Behind the curtain
 
-From _R_ to C
-
 S-expressions
+
+From _R_ to C
 
 The public API
 
@@ -699,7 +830,9 @@ When to worry?
 - uuid: globally unique id.
 - Provided by [Boost uuid][uuid] 'header only' C++ library.
 
-1. Create a package and 'src' directory
+1. Create a package and 'src' directory. Add the `LinkingTo:` tag to
+   indicate that the package is going to link to (C++) header files
+   provided by the [BH][] ('Boost Headers') package.
 
     ```{r}
     devtools::create("/tmp/uuid", list(LinkingTo = "BH"))
@@ -710,14 +843,15 @@ When to worry?
 
     ```{r}
     devtools::use_testthat("/tmp/uuid")
-    cat('context("uuid")
-         
-         test_that("uuid returns different values", {
-             expect_true(is.character(uuid()))
-             expect_true(length(uuid()) == 1L)
-             uu <- unique(unlist(replicate(100, uuid())))
-             expect_identical(length(uu), 100L)
-         })', 
+    cat('
+    context("uuid")
+
+    test_that("uuid returns different values", {
+        expect_true(is.character(uuid()))
+        expect_true(length(uuid()) == 1L)
+        uu <- unique(unlist(replicate(100, uuid())))
+        expect_identical(length(uu), 100L)
+    })',
         file = "/tmp/uuid/tests/testthat/test_uuid.R"
     )
     ```
@@ -725,17 +859,18 @@ When to worry?
 3. Implement the 'C++' layer
 
     ```{r}
-    cat('#include <boost/uuid/uuid_generators.hpp>
-         #include <boost/uuid/uuid_io.hpp>
-         
-         static boost::uuids::random_generator uuid_generator =
-             boost::uuids::random_generator();
+    cat('
+    #include <boost/uuid/uuid_generators.hpp>
+    #include <boost/uuid/uuid_io.hpp>
 
-         std::string uuid_generate()
-         {
-             return boost::uuids::to_string(uuid_generator());
-         }
-        ',
+    static boost::uuids::random_generator uuid_generator =
+        boost::uuids::random_generator();
+
+    std::string uuid_generate()
+    {
+        return boost::uuids::to_string(uuid_generator());
+    }
+    ',
         file = "/tmp/uuid/src/uuid.cpp"
     )
     ```
@@ -743,13 +878,13 @@ When to worry?
 4. Implement the interface from C++ to _R_'s C layer.
 
     ```{r}
-    cat('#include <Rinternals.h>
+    cat('
+    #include <Rinternals.h>
 
-         SEXP uuid()
-         {
-             return mkString(uuid_generate().c_str());
-         }
-        ',
+    SEXP uuid()
+    {
+        return mkString(uuid_generate().c_str());
+    }',
         file = "/tmp/uuid/src/uuid.cpp",
         append = TRUE
     )
@@ -758,21 +893,21 @@ When to worry?
 5. Implement the interface from _C_ to _R_.
 
     ```{r}
-    cat('#include <R_ext/Rdynload.h>
-    
-         extern "C" {
+    cat('
+    #include <R_ext/Rdynload.h>
 
-             static const R_CallMethodDef callMethods[] = {
-                 {".uuid", (DL_FUNC) &uuid, 0},
-                 {NULL, NULL, 0}
-             };
-             
-             void R_init_uuid(DllInfo *info)
-             {
-                 R_registerRoutines(info, NULL, callMethods, NULL, NULL);
-             }
-         }
-        ',
+    extern "C" {
+
+        static const R_CallMethodDef callMethods[] = {
+            {".uuid", (DL_FUNC) &uuid, 0},
+            {NULL, NULL, 0}
+        };
+
+        void R_init_uuid(DllInfo *info)
+        {
+            R_registerRoutines(info, NULL, callMethods, NULL, NULL);
+        }
+    }',
         file = "/tmp/uuid/src/uuid.cpp",
         append = TRUE
     )
@@ -798,13 +933,99 @@ When to worry?
     devtools::install("/tmp/uuid")
     ```
 
-8. Return to regularly scheduled program
+<!--
+```{r}
+unlink("/tmp/uuid", recursive = TRUE)
+```
+-->
 
-    ```{r}
-    unlink("/tmp/uuid", recursive = TRUE)
+### Exercises
+
+Add the following unit test and implement appropriate functionality
+
+```{r, eval=FALSE}
+test_that("uuid returns multiple values", {
+    n <- 5
+    result <- uuid(5)
+    expect_true(is.character(result))
+    expect_identical(length(result), 5L)
+    expect_identical(length(unique(result)), 5L)
+})
+```
+
+Do this in several stages, from 'easy' to harder
+
+1. Implement the _R_ infrastructure by adding an argument `n` to the
+   definition of the _R_-level `uuid()`. Provide `n` with a default
+   value so that the original unit tests continue to work, i.e., that
+   `devtools::test("/tmp/uuid")` still passes the original tests.
+
+2. Pass the argument `n` to C. Do this by adding `n` to the _R_-level
+   `.Call()`. Then modify the C-level `uuid()` to accept an SEXP as
+   argument, so the signature is `SEXP uuid(SEXP n_sexp)`. Update the
+   `callMethods[]` array so that the `uuid` function takes 1
+   argument. Test that the source code compiles using, e.g.,
+   `devtools::install("/tmp/uuid")` or by running the unit tests
+   again.
+
+3. In _C_, modify `uuid()` to check that the argument is in fact a
+   scalar integer. Do this by using the macro `IS_SCALAR()` and
+   function `Rf_asInteger()` and the constant `R_NaInt`; see the
+   header file 'Rinternals.h' in `R.home("include")`. Signal an error
+   with `Rf_error()`. You'll add code that looks like
+
+    ```
+    bool test = IS_SCALAR(n_sexp, INTSXP) && (R_NaInt != Rf_asInteger(n_sexp));
+    if (!test)
+        Rf_error("'n' cannot be coerced to integer(1) and not NA");
+    int n = Rf_asInteger(n_sexp);
     ```
 
+4. Modify `uuid()` to allocate an SEXP to contain the result -- a
+   STRSXP of length `n`. This allocated SEXP needs to be protected
+   from garbage collection, because it is an _R_ memory allocation not
+   associated with a symbol. Protection is provided by the `PROTECT()`
+   macro, which is traditional wrapped around functions that return
+   SEXP.
+
+    ```
+    SEXP result = PROTECT(Rf_allocVector(n, STRSXP));
+    ```
+
+5. Fill the return vector using a C loop, constructing a CHARSXP for
+   each element using `mkChar()` and setting the `i`th element of
+   `result` using the function `SET_STRING_ELT()`. Although at the _R_
+   level the first element of a vector is element number 1, in C the
+   first element is 0.
+
+    ```
+    for (int i = 0; i < n; ++i)
+        SET_STRING_ELT(result, i, mkChar(uuid_generate().c_str()));
+    ```
+
+6. Our function is done; use `UNPROTECT()` to remove the protection on
+   the allocated SEXP (the calling function, in this case _R_ itself,
+   is resposible for PROTECTing any SEXP it recieves) and return the
+   result to _R_.
+
+    ```
+    UNPROTECT(result);
+    return result;
+    ```
+7. (Optional) As a nicety for our users, coerce their _R_-level
+   argument `n` to an integer (so, e.g., they can provide `5` rather
+   than `5L` as the argument). This can be done at the _R_ level using
+   `as.integer()`, or at the C level with the following. Consider the
+   merits of each approach.
+
+    ```
+    n_sexp = PROTECT(Rf_coerceVector(n_sexp, INTSXP));
+    ```
+
+
+
 [uuid]: http://www.boost.org/doc/libs/1_64_0/libs/uuid/
+[BH]: https://cran.r-project.org/package=BH
 
 ## Rcpp
 
