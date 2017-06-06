@@ -807,9 +807,55 @@ Found a bug, now what?
 
 S-expressions
 
+- _R_ 'atomic' vectors (`numeric()`, `logical()`, etc), lists,
+  environments, functions, etc., are represented by C `struct`s
+- The C `struct` is called an 'S-expression', represented by the
+  symbol `SEXP` (which I pronounce 'S-exp')
+- `SEXP` is defined in [Rinternals.h][SEXP-def]
+- An `SEXP` is polymorhpic -- the interpretation of the struct depends
+  on type information contained in the `SEXP`
+  itself. [Types][SEXP-types] are enumerated as `INTSXP`, `REALSXP`,
+  ...
+      - `STRSXP`: `character()`, each element of a character vector is
+        a `CHARSXP`.
+      - `VECSXP`: `list()`; `LISTSXP` is a 'pair-list' primarily used
+        to represent function arguments.
+      - `EXTPTRSXP`: an _R_ reference to arbitrary data that is not
+        represented in _R_, e.g., an C++ class.
+- All `SEXP` contain [sexpinfo][], with named, garbage collect,
+  marked, and other status, as well as actual data (e.g., the integers
+  of an `integer()` vector.
+- Macros (actually, [functions][sexp-functions] in package code)
+  control access to the `SEXP` data structure. Several styles
+      - e.g., `LENGTH()`, `Rf_length()`
+      - Generally, prefer the `Rf_*` style.
+
 From _R_ to C
 
+- Several routes -- `.Internal()`, `.External()`, `.C()`, `.Call()`, ...
+- `.C()`: _R_ does some work to coerce _R_ types, e.g., `integer()` to
+  _C_ types, `int *`; useful for many light-weight purposes.
+      - `character()` and more complicated objects difficult to deal
+        with.
+      - Return value must be allocated and passed from _R_.
+- `.Call()`: _R_ arguments are represented as `SEXP`
+    - Flexible; main focus of serious development.
+    - [Rcpp][] uses this convention, but wraps the details of _R_'s
+      `SEXP` in C++ idioms.
+
 The public API
+
+- Defined by [Rinternals.h][] and friends
+- Documented in [Writing R Extensions][R-exts] 'System and foreign
+  language interface'.
+
+[Rinternals.h]: https://github.com/wch/r-source/blob/trunk/src/include/Rinternals.h
+[R-exts]: https://cran.r-project.org/doc/manuals/r-release/R-exts.html#System-and-foreign-language-interfaces
+[SEXP-def]: https://github.com/wch/r-source/blob/trunk/src/include/Rinternals.h#L283
+[SEXP-types]: https://github.com/wch/r-source/blob/trunk/src/include/Rinternals.h#L112
+[sexpinfo]: https://github.com/wch/r-source/blob/trunk/src/include/Rinternals.h#L197
+[sexp-functions]: https://github.com/wch/r-source/blob/trunk/src/include/Rinternals.h#L1177
+[Rcpp]: https://cran.r-project.org/package=Rcpp
 
 ## Old-school approaches to foreign langauges
 
@@ -883,7 +929,8 @@ When to worry?
     SEXP uuid()
     {
         return mkString(uuid_generate().c_str());
-    }',
+    }
+    ',
         file = "/tmp/uuid/src/uuid.cpp",
         append = TRUE
     )
@@ -915,11 +962,12 @@ When to worry?
 6. Implement the end-user API in _R_.
 
     ```{r}
-    cat("#' @useDynLib uuid, .registration = TRUE
-         #' @export
-         uuid <- function()
-             .Call(.uuid)
-        ",
+    cat("
+    #' @useDynLib uuid, .registration = TRUE
+    #' @export
+    uuid <- function()
+         .Call(.uuid)
+    ",
         file = "/tmp/uuid/R/uuid.R"
     )
     ```
@@ -1008,7 +1056,7 @@ Do this in several stages, from 'easy' to harder
    result to _R_.
 
     ```
-    UNPROTECT(result);
+    UNPROTECT(1);
     return result;
     ```
 7. (Optional) As a nicety for our users, coerce their _R_-level
@@ -1021,13 +1069,39 @@ Do this in several stages, from 'easy' to harder
     n_sexp = PROTECT(Rf_coerceVector(n_sexp, INTSXP));
     ```
 
-
-
 [uuid]: http://www.boost.org/doc/libs/1_64_0/libs/uuid/
 [BH]: https://cran.r-project.org/package=BH
 
 ## Rcpp
 
-## Into the weeds
+## Into the weeds: fun (?!) with C-level debugging
 
-Fun (?!) with `gdb`
+Setup
+
+- `gdb` on linux, `lldb` on Mac
+- Code compiled _with_ debugging symbols and _without_ optimizations
+- One approach:
+
+    ```
+    $ cat ~/.R/Makevars
+    CFLAGS = -g -O0
+    CXXFLAGS = -g -O0
+    CXX11FLAGS = -g -O0
+    ```
+
+- Alternative: configure _R_ with appropriate `CFLAGS`, etc.
+
+Overall
+
+- Start _R_ and launch debugger
+
+    ```
+    $ R -d gdb
+    (gdb) 
+    ```
+- Start the _R_ process, load packages, etc., break into the debugger
+
+    ```
+    (gdb) run
+    > library(uuid)
+    
