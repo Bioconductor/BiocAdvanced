@@ -721,21 +721,21 @@ g <- function(x) {
     ```{r, eval=FALSE}
     f(-1)
     ## Error: all(x >= 0) is not TRUE
-    ## 
+    ##
     ## Enter a frame number, or 0 to exit
-    ## 
+    ##
     ## 1: f(-1)
     ## 2: #2: stopifnot(all(x >= 0))
-    ## 
+    ##
     ## Selection: 2
     ## Called from: f(-1)
     ## Browse[1]> c
-    ## 
+    ##
     ## Enter a frame number, or 0 to exit
-    ## 
+    ##
     ## 1: f(-1)
     ## 2: #2: stopifnot(all(x >= 0))
-    ## 
+    ##
     ## Selection:
     ```
 
@@ -1097,11 +1097,55 @@ Overall
 
     ```
     $ R -d gdb
-    (gdb) 
+    (gdb)
     ```
 - Start the _R_ process, load packages, etc., break into the debugger
 
     ```
     (gdb) run
     > library(uuid)
-    
+    > uuid()
+    Error in uuid() : invalid type/length (symbol/16) in vector allocation
+    ```
+
+- Break into the debugger, set a breakpoint at the point where _R_
+  throws an error, and continue
+
+    ```
+    > ^C
+    (gdb) break Rf_error
+    (gdb) continue
+    >
+    ```
+
+- Trigger the error
+
+    ```
+    > uuid()
+    Breakpoint 1, Rf_error (
+        format=0x643020 "invalid type/length (%s/%d) in vector allocation")
+        at /home/mtmorgan/src/R-3-4-branch/src/main/errors.c:821
+    821	{
+    (gdb)
+    ```
+
+- Discover `where` you are in the call stack. Mostly we're in _R_'s
+  source code where bugs are unlikely (though not impossible!) three
+  up is our own code
+
+    ```
+    (gdb) where
+    #0  Rf_error (
+        format=0x643020 "invalid type/length (%s/%d) in vector allocation")
+        at /home/mtmorgan/src/R-3-4-branch/src/main/errors.c:821
+    #1  0x0000000000525dbc in Rf_allocVector3 (type=1, length=16, allocator=0x0)
+        at /home/mtmorgan/src/R-3-4-branch/src/main/memory.c:2612
+    #2  0x000000000050e5c0 in Rf_allocVector (type=1, length=16)
+        at /home/mtmorgan/src/R-3-4-branch/src/include/Rinlinedfuns.h:196
+    #3  0x00007fffed786780 in uuid (n_sexp=0x21a16a8) at uuid.cpp:26
+    #4  0x000000000048b7e3 in R_doDotCall (ofun=0x7fffed7866ac <uuid(SEXPREC*)>,
+        nargs=1, cargs=0x7fffffffbdd0, call=0x19f7d48)
+        at /home/mtmorgan/src/R-3-4-branch/src/main/dotcode.c:570
+    ```
+
+- Navigate and look around
