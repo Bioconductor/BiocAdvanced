@@ -1151,6 +1151,16 @@ Setup
 
 Overall
 
+- Get and install a copy of our uuid package from GitHub
+
+    ```
+    $ git clone https://github.com/Bioconductor/BiocAdvanced
+    $ cd BiocAdvanced
+    $ git checkout Zurich-2017
+    $ cd inst/uuid
+    $ R CMD INSTALL .
+    ```
+
 - Start _R_ and launch debugger
 
     ```
