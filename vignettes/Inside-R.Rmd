@@ -801,6 +801,65 @@ Found a bug, now what?
     }
     ```
 
+## Packages
+
+Structure
+
+- Directory
+- DESCRIPTION and NAMESPACE files (required)
+    - DESCRIPTION: key-value pairs describing the package, e.g.,
+      'Title:', 'Version:', 'License:', etc.
+- R/ directory
+    - Files containing functions
+    - Following a logical organization with consistent formatting
+- man/ directory
+    - Files in '.Rd' format
+    - Structured in parallel to R/ directory, R/foo.R --> R/foo.Rd
+- vignettes/ directory
+    - One or more vignettes, R markdown (.Rmd) or LaTeX / Sweave
+      (.Rnw)
+    - Markdown much prefered for user-oriented documentation.
+    - My preference: no 'derived' files, e.g., HTML produced from Rmd.
+- inst/
+    - data/: R objects, e.g., '.rds' file.
+    - extdata/: Non-R data resources, e.g., SQL data base.
+    - .../: any other files or folders that need to be _inst_alled
+      into the _R_ library.
+- src/: C, C++, Fortran, or other 'foreign' code.
+
+Creation
+
+- `devtools::create("MyPackage")`
+
+Development
+
+- `devtools::load_all()` to reduce the edit-install-run loop.
+- `devtools::use_testthat()` and `devtools::test()` for [testthat][]
+  unit tests.
+- `devtools::document()` ([roxygen2][]) for documentation.
+- `devtools::test()` (run unit tests); `devtools::check()`
+
+N.B.
+
+- _ALL_ of the steps above (package creation, installation, writing
+  .Rd documentation files, build, check) can be done 'easily' from
+  scratch.
+- Final arbiter:
+    ```
+    R CMD build MyPackage   # source for version 0.99.1 of package
+    R CMD check MyPackage_0.99.1.tar.gz
+    ```
+
+Mangement
+
+- [git][] and [GitHub][]!
+
+[devtools]: https://cran.r-project.org/package=devtools
+[testthat]: https://cran.r-project.org/package=testthat
+[roxygen2]: https://cran.r-project.org/package=roxygen2
+[git]: https://git-scm.com/
+[GitHub]: https://github.com
+
 # Finding the inner _R_: the C API and implementation
 
 ## Behind the curtain
@@ -1074,7 +1133,7 @@ Do this in several stages, from 'easy' to harder
 
 ## Rcpp
 
-## Into the weeds: fun (?!) with C-level debugging
+## Fun (?!) with C-level debugging
 
 Setup
 
