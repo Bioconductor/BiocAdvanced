@@ -9,34 +9,83 @@ output:
   BiocStyle::html_document
 ---
 
-# Classic, tidy, rich data representations
+# Rants
 
-# Packages
+## Classic, tidy, rich data representations
 
-- Olde school / new school documentation
-- Tests
-- Dependencies
+Context
 
-# Continuous Integration
+- Classic: sample x feature `data.frame()`.
+- Tidy: long-form `data.frame()`.
+- Rich: domain-specific, object oriented.
 
-Continuous integration of your package on both Linux and Windows platforms
-via (mostly) GitHub webhooks
+Vocabulary
 
-- [Travis-CI][]: Linux setup for continuous integration
-- [AppVeyor][]: Windows instance for package testing
-(available for 32 & 64 bit architectures)
-- [Wercker][]: Docker-container-based integration option may work with
-already available Bioconductor Docker images
-- [Codeship][]: Supports bitbucket
-- [R-Hub][]: Integrated with R, still in development
+- Simple: extensive
+- Tidy: restricted 'endomorphisms'
+- Rich: extensive, 'meaningful'
 
-The first three work with package-level YAML files to setup an integration
-environment. Cost-effective options for testing your package.
+Constraints (e.g., probes & samples)
 
-# Scaling and performance
+- Tidy: implicit
+- Simple, Rich: explicit
 
-# Visualization, interactivity, ...
+Flexibility
 
+- Simple, tidy: general-purpose
+- Rich: specialized
+
+Programming contract
+
+- Simple, tidy: limited
+- Rich: strict
+
+Lessons learned / best practices
+
+- Considerable value in semantically rich structures
+- Current implementations trade-off user and developer
+  convenience
+- Endomorphism, simple vocabulary, consistent paradigm aid use
+
+## Scaling and performance
+
+- Write efficient _R_ code first (10 - 100x speedup, often cleaner and
+  more robust)
+- Scale to cores, cluster, cloud when needed
+    - 10x (cores) - 100x (large clusters / clouds) 'faster'
+    - 10x - 100x more complicated and fragile!
+
+## Visualization, interactivity, ...
+
+- [plotly][]`::ggplotly()` makes interactive visualization
+  more-or-less a no-brainer.
+- [shiny][] is also 'fun' and 'easy' interactivity.
+    - Especially valuable for throw-away applications, e.g., for use
+      with a local collaborator for data exploration.
+    - More ambitious problems _must_ be built _on top of_ robust,
+      testable, functions and script-based work flows implemented as
+      fully documented and tested _R_ packages.
+
+[plotly]: https://cran.r-project.org/package=plotly
+[shiny]: https://cran.r-project.org/package=shiny
+
+# Olde school / neue school
+
+## Continuous Integration
+
+- Commits trigger a script to build and check your package
+- Continuous integration on Linux and Windows platforms via (mostly)
+  [GitHub][] webhooks or integrations
+    - [Travis-CI][]: Linux setup for continuous integration
+    - [AppVeyor][]: Windows instance for package testing (available for 32
+      & 64 bit architectures)
+    - [Wercker][]: Docker-container-based integration option may work with
+      already available _Bioconductor_ Docker images
+    - [Codeship][]: Supports bitbucket
+    - [R-Hub][]: Integrated with R, still in development
+- The first three work with package-level YAML files to setup an
+  integration environment. Cost-effective option for cross-platform
+  testing.
 
 [Travis-CI]: https://www.travis-ci.org
 [AppVeyor]: https://www.appveyor.com
@@ -44,3 +93,73 @@ environment. Cost-effective options for testing your package.
 [Codeship]: https://codeship.com/
 [R-Hub]: https://github.com/r-hub/rhub
 
+## Do I / Will I use...
+
+[devtools][] `create()`, `load_all()`, `check()`
+
+- Yes, until I run into mysterious S4 / namespace problems. These are
+  often devtools limitations.
+
+[roxygen2][] (e.g., `devtools::document()`)
+
+- Yes, but I pay a lot of attention to consolidating documentation on
+  fewer pages -- not 'one function, one man page' -- and end up
+  writing important parts of the docs in `Rd`-style.
+
+[testthat][] (e.g., `devtools::use_testthat()`, `devtools::test()`)
+
+- Yes, unit tests are essential, and this is a nice package.
+
+[Rcpp][]
+
+- No, but I feel like I should...
+- STL containers and algorithms can help a lot with formulating basic
+  solutions.
+- Effective [Rcpp][] use (given my current state of _R_'s C API)
+  requires a deeper understanding of C++.
+  
+Pipes and lazy evaluation (e.g., [magrittr][], `%>%`)
+
+- No, not for robust code development.
+- Emphasizes 'endomorphisms' (function returns same object as first
+  argument), which is probably good.
+
+S3 or S4 'reference' classes
+
+- Only under limited circumstances.
+- S3: internal _and_ lightweight, or for interoperability.
+- S4 'reference' classes -- when reference-based semantics are
+  appropriate -- almost never with data objects; sometimes it seems
+  like files and connections have reference-based semnatics, but I
+  often try this and 'get it wrong'...
+  
+Other class systems
+
+- No, _R_ is weird enough.
+
+[git][] and [GitHub][]
+
+- Yes, git's local repositories and branching are great.
+- [GitHub][]'s issue tracker and pull requests are useful for
+  relatively small collections of repositories.
+
+Continuous integration
+
+- Yes, but I'll still rely on local `R CMD build` / `R CMD check`
+  before pushing commits.
+
+(R / Bioconductor) [Docker][] and [AMI][] containers
+
+- No, not for my daily work; it pays to have a fully function native
+  installation.
+- AMIs are great for courses.
+
+[devtools]: https://cran.r-project.org/package=devtools
+[roxygen2]: https://cran.r-project.org/package=roxygen2
+[testthat]: https://cran.r-project.org/package=testthat
+[Rcpp]: https://cran.r-project.org/package=Rcpp
+[magrittr]: https://cran.r-project.org/package=magrittr
+[git]: https://git-scm.com/
+[GitHub]: https://github.com
+[Docker]: https://bioconductor.org/help/docker/
+[AMI]: https://bioconductor.org/help/bioconductor-cloud-ami/
