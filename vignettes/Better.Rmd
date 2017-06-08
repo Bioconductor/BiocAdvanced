@@ -17,6 +17,30 @@ output:
 - Tests
 - Dependencies
 
+# Continuous Integration
+
+Continuous integration of your package on both Linux and Windows platforms
+via (mostly) GitHub webhooks
+
+- [Travis-CI][]: Linux setup for continuous integration
+- [AppVeyor][]: Windows instance for package testing
+(available for 32 & 64 bit architectures)
+- [Wercker][]: Docker-container-based integration option may work with
+already available Bioconductor Docker images
+- [Codeship][]: Supports bitbucket
+- [R-Hub][]: Integrated with R, still in development
+
+The first three work with package-level YAML files to setup an integration
+environment. Cost-effective options for testing your package.
+
 # Scaling and performance
 
 # Visualization, interactivity, ...
+
+
+[Travis-CI]: https://www.travis-ci.org
+[AppVeyor]: https://www.appveyor.com
+[Wercker]: https://www.wercker.com
+[Codeship]: https://codeship.com/
+[R-Hub]: https://github.com/r-hub/rhub
+
