@@ -803,9 +803,8 @@ Found a bug, now what?
 
 ## Packages
 
-Structure
+Structure: A simple directory with specific files and structure
 
-- Directory
 - DESCRIPTION and NAMESPACE files (required)
     - DESCRIPTION: key-value pairs describing the package, e.g.,
       'Title:', 'Version:', 'License:', etc.
