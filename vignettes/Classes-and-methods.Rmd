@@ -6,10 +6,10 @@ vignette: >
   %\VignetteIndexEntry{Vignette Title}
   %\VignetteEngine{knitr::rmarkdown}
 output: 
-  BiocStyle::html_document
+  BiocStyle::html_document2
 ---
 
-# _R_ data and programs
+# _R_ data (classes) and programs (functions and methods)
 
 ## Building blocks
 
@@ -24,7 +24,6 @@ anova(fit)
 Atomic vectors
 
 - `logical()`, `integer()`, `numeric()`, `complex()`, `raw()`, `character()`
-- `list()`
 
 Attributes
 

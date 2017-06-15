@@ -6,7 +6,7 @@ vignette: >
   %\VignetteIndexEntry{Inside the mind of R}
   %\VignetteEngine{knitr::rmarkdown}
 output:
-  BiocStyle::html_document
+  BiocStyle::html_document2
 ---
 
 # _R_ as we know it
