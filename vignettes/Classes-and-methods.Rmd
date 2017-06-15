@@ -13,7 +13,18 @@ output:
 
 ## Building blocks
 
+```{r}
+x <- rnorm(1000)
+y <- x + rnorm(1000)
+df <- data.frame(Independent = x, Dependent = y)
+fit <- lm(Dependent ~ Independent, df)
+anova(fit)
+```
+
 Atomic vectors
+
+- `logical()`, `integer()`, `numeric()`, `complex()`, `raw()`, `character()`
+- `list()`
 
 Attributes
 
@@ -23,6 +34,9 @@ An implicit class -- `matrix()`
 
 `list()` and `environment()`
 
+- recursive
+- `environment()`: reference semantics
+
 Plain-old-functions
 
 - First class objects
@@ -31,8 +45,44 @@ Plain-old-functions
 
 Class
 
-- Definition
-- Inheritance
+- Definition -- list (usually) or atomic vector with `class` attribute
+- Inheritance: _is-a_ and _has-a_
+    - linear hierarchy
+
+```{r}
+People <- function(name = character(), age = character()) {
+    stopifnot(
+        is.character(name), is.numeric(age), length(name) == length(age)
+    )
+    structure(list(name=name, age=age), class = "People")
+}
+
+Employees <- function(people = People(), job = character()) {
+    stopifnot(
+        identical(class(people), "People"), is.character(job),
+        length(people) == length(job)
+    )
+    employees <- people
+    employees$job <- job
+    class(employees) <- c("Employees", class(employees))
+    employees
+}
+
+Company <- function(company_name = character(), empolyees = Employees()) {
+    stopifnot(
+        is.character(company_name), length(company_name) == 1L,
+        !is.na(company_name),
+        inherits(employees, "Employees")
+    )
+    structure(
+        list(
+            company_name = company_name, 
+            employees = employees
+        ),
+        class = "Company"
+    )
+}
+```
 
 Generic
 
@@ -47,6 +97,52 @@ Formal characteristics
 - Strengths & weakneses
 
 ## S4
+
+### Preamble
+
+- Formal class definitions
+- Many similar concepts, but greater flexibility in class
+  _inheritance_ and method _dispatch_
+- Despite it's reputation, not overly verbose compared to
+  well-structured S3 classes
+
+```{r}
+People <- setClass(
+    "People",
+    slots = c(name = "character", age = "numeric")
+)
+
+setValidity("People", function(object) {
+    if (!identical(length(name(object)), length(age(object)))) {
+        "lengths of name() and age() differ"
+    } else TRUE
+})
+
+Employees <- setClass(
+    "Employees", 
+    contains = "People",
+    slots = c(job = "character")
+)
+
+setValidity("Employees", function(object) {
+    if (!identical(length(employees(object)), length(jobs(object)))) {
+        "length of employee() and job() differ"
+    } else TRUE
+})
+
+Company <- setClass(
+    "Company",
+    slots = c(company_name = "character", employee = "Employees")
+)
+
+setValidity("Company", function(object) {
+    if (length(company_name) != 1 || !is.na(company_name)) {
+        "company_name must be length 1 and not NA"
+    } else TRUE
+})
+```
+
+## Classes, generics, and methods
 
 Class
 
