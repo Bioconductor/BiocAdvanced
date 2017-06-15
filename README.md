@@ -4,6 +4,18 @@ Instructors: Martin Morgan, Herve Pages<br />
 Date: June 19-20, 2017<br />
 Location: University of Zurich
 
+This course covers details of _R_'s evaluation, vector representation,
+garbage collection, C interface, and S3 and S4 approaches to complex
+data representation. The course is meant to provide attendees with the
+knowledge and confidence to confront _R_ behavior and programming
+challenges. Participants should be very comfortable with _R_ syntax;
+ideally they will have experience writing _R_ packages, basic
+familiarity with S3 and / or S4 object systems, and have at least
+thought about tackling C-level implementations of complicated
+algorithms. The course includes discussion of _Bioconductor_'s S4
+object system, offering insight into using and designing data
+representations for large and complex data.
+
 - [Preparation][] (Optional)
 
 Part 1: [Inside the mind of _R_][] (Day 1)
