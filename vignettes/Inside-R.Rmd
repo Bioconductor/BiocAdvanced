@@ -499,7 +499,7 @@ Evaluation, lazy and non-standard evaluation
 
 ### Exercises
 
-***Exercise:*** bank account
+**Exercise:** bank account
 
 - Congratulations, you own a bank! Here's a function that creates an
   account, and provides access to it
@@ -597,7 +597,7 @@ Evaluation, lazy and non-standard evaluation
     ```
 -->
 
-***Exercise:*** bank account 2
+**Exercise:** bank account 2
 
 - What changes to implementation would be require to allow
 
@@ -607,7 +607,7 @@ Evaluation, lazy and non-standard evaluation
     })
     ```
 
-***Exercise:*** package-local options
+**Exercise:** package-local options
 
 - Implement 'package-local' options that the user can set via
   functions. Do this by using `local()` to create and populate an

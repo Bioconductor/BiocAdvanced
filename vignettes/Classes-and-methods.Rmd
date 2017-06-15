@@ -96,6 +96,30 @@ Formal characteristics
 
 - Strengths & weakneses
 
+### Exercises
+
+**Exercise:** `length()` S3 method
+
+`?length` indicates that this function is a (S3) method. Define an S3
+`length` method for the `People` class; note that we use this when
+validating the input to `Employees()`.
+
+**Exercise:** `name()` and `age()` accessors
+
+The `Person` class has fields `name` and `age`. These are accessible
+by reaching in to the implementation details and extracting the list
+element, e.g., `Person()$name`. But this type of direct manipulation
+is considered bad practice; it is better to have 'accessors' that
+define the 'application programming interface (API)' for accessing
+information from the object. Write plain-old-functions (e.g., like
+`name <- function(x) ...`) to extract name and age.
+
+**Exercise** S3 generics and methods
+
+Revise `name()` and `age()` to be S3 generics and methods. Reflect on
+the beneifts and costs of plain-old-functions versus generic +
+methods.
+
 ## S4
 
 ### Preamble
