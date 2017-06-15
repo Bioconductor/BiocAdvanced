@@ -100,7 +100,7 @@ Formal characteristics
 
 **Exercise:** `length()` S3 method
 
-`?length` indicates that this function is a (S3) method. Define an S3
+`?length` indicates that this function is a (S3) generic. Define an S3
 `length` method for the `People` class; note that we use this when
 validating the input to `Employees()`.
 
@@ -114,7 +114,7 @@ define the 'application programming interface (API)' for accessing
 information from the object. Write plain-old-functions (e.g., like
 `name <- function(x) ...`) to extract name and age.
 
-**Exercise** S3 generics and methods
+**Exercise:** S3 generics and methods
 
 Revise `name()` and `age()` to be S3 generics and methods. Reflect on
 the beneifts and costs of plain-old-functions versus generic +
