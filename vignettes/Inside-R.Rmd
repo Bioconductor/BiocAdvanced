@@ -1,6 +1,6 @@
 ---
 title: "Inside the mind of _R_"
-author: "Martin Morgan, Herve Pages"
+author: "Martin Morgan, Hervé Pagès"
 date: "June 19 - 20, 2017"
 vignette: >
   %\VignetteIndexEntry{Inside the mind of R}

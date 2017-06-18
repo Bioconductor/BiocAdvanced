@@ -1,6 +1,6 @@
 # Advanced _R_ and _Bioconductor_
 
-Instructors: Martin Morgan, Herve Pages<br />
+Instructors: Martin Morgan, Hervé Pagès<br />
 Date: June 19-20, 2017<br />
 Location: University of Zurich
 
