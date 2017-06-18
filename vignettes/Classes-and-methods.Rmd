@@ -9,6 +9,8 @@ output:
   BiocStyle::html_document2
 ---
 
+
+
 # _R_ data (classes) and programs (functions and methods)
 
 ## Building blocks
@@ -123,11 +125,47 @@ methods.
 
 ### Preamble
 
-- Formal class definitions
-- Many similar concepts, but greater flexibility in class
-  _inheritance_ and method _dispatch_
+- S4 class system implemented in the methods package
+
+- S4 classes are sometimes called _formal classes_
+
+### Strength of S4 (compared to S3)
+
+- multiple dispatch
+
+- validity
+
+- virtual/concrete classes
+
+- virtual classes with no slots (equiv to Java interface)
+
+- multiple inheritance: to be used carefully. Typical use case is to
+  put more than 1 interface on top of a class by having it inherit
+  1 or more virtual classes with no slots
+
+- class unions (just a special kind of virtual class with no slots)
+
+- what about reference classes? they are rarely needed.
+  As a general principle, R objects should have a pass-by-copy semantic
+  so passing them to a function is guaranteed to leave the original object
+  unmodified. Pass-by-reference semantic is almost never needed and should
+  be avoided.
+
+- What you see and feel is not what's inside:
+
+- API vs internals: the Bioconductor approach to S4 object implementation
+  is to hide what an object really contains from the end user. The slots
+  and what they contain are called the _internals_ of the object and should
+  not matter to the end user. What matters is the _semantic_ of an object
+  i.e. _what_ it represents and how it can be manipulated (API).
+
+- Even developers who implement a new class by extending an existing class
+  should try to do it in a way that is as agnostic as possible.
+
 - Despite it's reputation, not overly verbose compared to
   well-structured S3 classes
+
+### Example
 
 ```{r}
 People <- setClass(
@@ -188,6 +226,8 @@ Formal characteristics
 - Strengths & weakneses
 - Column- versus row-oriented data
 
+
+
 # Essential _Bioconductor_ classes
 
 ## Motivation / necessity
@@ -196,15 +236,410 @@ Users
 
 Developers
 
-Key classes for end users
+## Key classes for end users
 
 - GenomicRanges
 - SummariedExperiment
 
-## Design in depth
 
-Concepts
 
-Efficiencies
+# Design and implementation of S4 classes
 
-Common 'tricks'
+## Implementing an S4 class
+
+### 2 approaches
+
+- Extend an existing class (less work)
+
+- Sometimes from scratch (a rare situation)
+
+### What to implement
+
+#### Core stuff
+
+- class def
+
+- validity
+
+- constructor
+
+- show method
+
+#### API
+
+- At a minimum some accessors (getters). Try to reuse existing
+  generics instead of introducing new ones e.g.:
+    - organism, score (defined in BiocGenerics), strand
+    - seqinfo (defined in GenomeInfoDb)
+
+- Plus, depending on the "shape" of the objects, methods for some
+  of the core generic functions in base R:
+
+    length, names, subsetting ([, [[), dim, dimnames, c(),
+    setters, names<-, subassignment ([<-, [[<-), dimnames<-
+
+- Specialized operations: as methods for existing generics
+  (e.g. normalize, defined in BiocGenerics) or for new generics.
+
+#### Coercion methods
+
+TODO (give examples)
+
+#### Subtle difference between being an "A instance" and an "A object"
+
+TODO (give examples)
+
+## On designing an API
+
+### Avoid surprises
+
+TODO (give examples)
+
+### Pay particular attention to how length, names, [, [[, c(), dim, dimnames behave
+
+WHY (give examples)
+
+### Most objects fall in one of these categories
+
+- vector-like: length()
+
+  Examples: atomic vectors and ordinary list in base R
+                  Rle, Hits, IRanges, GRanges, GRangesList, DNAString,
+                  DNAStringSet
+
+- list-like: vector-like + [[
+
+  Examples: ordinary list and data frames in base R
+                  CharacterList, IRanges, IRangesList, GRangesList,
+                  DNAStringSet
+
+- matrix-like, array-like objects: dim() and length(x) = prod(dim(x))
+
+  Examples: matrix and array objects in base R, Matrix objects in the
+            Matrix package, DelayedArray objects
+
+- data-frame-like: dim() + list-like along the columns
+
+  Examples: data.frame objects in base R, DataFrame
+
+These categories are not mutually exclusive:
+
+- list-like objects are vector-like objects
+
+- array-like objects are also vector-like objects
+
+- data-frame-like are list-like objects: length(x) = ncol(x)),
+  names(x) = colnames(x), x[[i]] = x[ , i]
+  They are NOT matrix-like objects.
+
+### _Shape_ of an object
+
+- linear: vector-like, list-like
+
+- rectangular: matrix-like, data-frame-like, SummarizedExperiment
+
+- multi-dimensional: array-like
+
+Rectangular and multi-dimensional objects have an "implicit linear
+shape". Think of it as the "backbone" of the object.
+
+For example, 3 linear shapes can be associated with a rectangular shape.
+They are described by the following "backbones":
+
+    1) "matrix-like backbone":
+
+         run from the top-left element to the bottom-right element of the
+         rectangle, going thru the entire rectangle by running down along
+         all the columns (continuing from the top of next column when reaching
+         the bottom of a column)
+
+       This is the backbone of matrix-like objects.
+       Array-like objects generalize this to N dimensions: backbone runs
+       along the first dimension first (fastest changing dimension in R is
+       the first one), then along the 2nd dimension, and so on...)
+
+    2) "data-frame-like backbone":
+
+         run *horizontally* from first to last column of the rectangle
+
+       This is the backbone of data-frame-like objects.
+
+    3) Bioconductor introduces a 3rd type of backbone for rectangular
+       objects:
+
+         run *vertically* from first to last row of the rectangle
+
+       This is the "SummarizedExperiment-like backbone".
+
+When implementing a class that represents rectangular objects, the
+developper should decide what the backbone of the objects will be.
+Concretely that means deciding what the "length" method will return:
+prod(dim(x)), ncol(x), or nrow(x)?
+Once this choice is made, things like names(x), x[i], and c() should
+behave consistently (e.g. c(x, y) should concatenate the 2 objects
+along their backbones).
+
+Making it clear what the backbone is in the documentation will help
+the user understand (and even predict) the behavior of length(x),
+names(x), x[i], c(), etc... No surprises!
+
+### Subsetting
+
+R syntax allows 8 different forms of subsetting:
+
+- [ vs [[
+
+- Linear (x[i] and x[[i]], also called 1D-style subsetting) vs
+  multi-dimensional (x[i_1, i_2, ..., i_n], x[[...]])
+  Linear subsetting is along the length of the object
+  (1 <= i <= length(x))
+
+- Extraction ([, [[) vs replacement ([<-, [[<-) (a.k.a. "subassignment")
+
+=> 2 x 2 x 2 = 8 forms of subsetting
+
+Some examples:
+
+- Ordinary matrix, array, data.frame, DataFrame objects support the 8 forms.
+  Gotcha: Implicit linear shape of matrix-like and data-frame-like objects
+  differ, and so do linear subsetting on them.
+
+- SummuarizedExperiment objects support rectangular (x[i, j]) and linear
+  (x[i]) subsetting. x[i] is equivalent to x[i, ].
+  Plus their replacement versions.
+  Gotcha: [[ is also supported but behaves in a non-standard way!
+
+- GRanges objects support linear [ and [<- only
+
+### To be or not to be an endomorphism
+
+#### Definition
+
+TODO
+
+#### Examples
+
+- [ (drop=FALSE) (except linear subsetting on an array-like object)
+
+- Replacement methods (including [<- and [[<-).
+  Examples: names(), mcols(), seqinfo() setters on any object for which
+  they are defined.
+ 
+  But with some notable exceptions:
+  - [<- on an atomic vector when the storage.mode of the vector cannot
+    represent the right-value (e.g. x[2] <- 3.4 on an integer vector,
+    or x[2] <- "a" on a numeric vector)
+
+  - rowRanges() setter on a SummarizedExperiment instance.
+
+- c() on linear objects (e.g. on Hits, GRanges, GRangesList,
+        DNAStringSet objects)
+
+- c() on rectangular objects with data-frame-like backbones
+        (equivalent to cbind())
+
+- c() on rectangular objects with SummarizedExperiment-like backbones
+        (equivalent to rbind())
+
+- Intra-range transformations (e.g. shift(), flank(), etc...)
+
+#### NOT endomorphisms
+
+- c() on array-like objects
+
+- Inter-range transformations (e.g. reduce(), disjoin()) in general are
+  not endomorphisms:
+
+    gpos <- GPos(c("chr1:4-20", "chr1:50-60"))
+    reduce(gpos)
+
+### Transformation that preserve positionality
+
+- Output "parallel" to input
+
+  EXPLAIN
+
+- Propagation of names and metadata columns
+
+- Can or be an endomorphism (ismorphism) or not
+
+
+## Reuse existing classes
+
+- It's very likely that Bioconductor already has a container that handles
+    the kind of data that your package needs to handle.
+
+- If not, then maybe extending an existing class by adding a few slots
+    is all you need to do.
+
+- Starting a new class from scratch should be the last resort.
+    Even in that case, it's very likely that you could extend one of the
+    virtual classes that are at the bottom of our core class hierarchy.
+    For example:
+
+- by extending Annotated you get the metadata() getter and setter
+      out-of-the-box.
+
+- by extending Vector (only if your objects are vector-like objects),
+      you get the above (Vector extends Annotated) + length() + the
+      mcols() getter and setter out-of-the box + a mechanism to facilitate
+      implemention of subsetting ([) and validation (via defining a
+      "parallelSlotNames" method).
+
+- by extending List (only if your objects are list-like objects)
+      you get the above (List extends Vector) + elementType() + as.list() +
+      a mechanism to facilitate implementation of [[.
+
+- Ask on the bioc-devel mailing list if you are not sure.
+
+### Concrete example: Extending the RangedSummarizedExperiment class.
+
+## Extending a class without adding any slot
+
+Typically to add constraints on the object.
+
+### Example: I want to implement a class that represent IRanges objects of constant width
+
+One option is to extend IRanges:
+
+  setClass("ConstantWidthIRanges", contains="IRanges")
+
+and to add the "constant width" constraint thru a validity method:
+
+  setValidity("ConstantWidthIRanges",
+      function(object)
+      {
+          w <- width(object)
+          if (length(w) != 0L && any(w != w[[1]]))
+              return("object width is not constant")
+          TRUE
+      }
+  )
+
+Open a parenthesis here to discuss
+
+      length(w) != 0L && any(w != w[[1]]
+
+vs
+
+      length(unique(w)) > 1
+
+The S4 system provides automatic coercion methods from parent to child
+(promotion) and from child to parent (downgrade).
+
+There is a gotcha with these methods though.
+
+Let's look at promotion:
+
+  x <- as(IRanges(6:8, width=10), "ConstantWidthIRanges")
+  validObject(x)
+  y <- as(IRanges(6:8, end=10), "ConstantWidthIRanges")
+
+mmmh... it worked, but it produced an invalid object:
+
+  validObject(x)
+
+Why?
+
+Let's look at downgrade:
+
+  x2 <- as(x, "IRanges")
+  y2 <- as(y, "IRanges")
+
+Works fine (both objects are valid IRanges objects)
+
+Note that there are other approaches to implementing constant-width IRanges
+objects.
+
+## Overriding existing methods
+
+- Override only if you see an oportunity for a more efficient implementation,
+  NEVER to change the semantics.
+
+- Examples: isEmpty() for ConstantWidthIRanges objects.
+
+      TODO (try to find a better example)
+
+## Extending vs composition
+
+Let's say we want to implement a class for representing a view on an array
+i.e. a multi-dimensional window on an array. The window can be represented
+by a set of ranges, one range per dimension e.g. [1-4, 1-5] for the topleft
+corner of a matrix. For an array with N dimensions, we need N ranges to
+represent the view. We'll call this kind of object a "viewport" (by analogy
+with the terminology used in the computer graphics world).
+
+In our viewport objects, we also want to store the dimensions of "the
+reference array" i.e. the array on top of which the viewport is defined
+(a.k.a. "the underlying array"). This will be useful for validation purposes.
+
+Consider the 2 following implementations:
+
+    setClass("ArrayViewport1",
+        contains="IRanges"
+        representation(
+            refdim="integer"
+        )
+    )
+
+    setClass("ArrayViewport2",
+        representation(
+            refdim="integer"
+            ranges="IRanges"
+        )
+    )
+
+One extends the IRanges class so inerits the IRanges slots and full IRanges
+API. is(x, "IRanges") will be true on these objects. This says: an
+ArrayViewport1 object *is* an IRanges object so can be used anywhere an
+IRanges object is expected.
+
+The other one uses composition. An ArrayViewport2 object *is not* an IRanges
+object but it *has* one (in its 'ranges' slot).
+
+In the end, the 2 containers store the same data but their semantics are
+very different. Which one to choose?
+
+It all depends!  MORE ON THIS...
+
+I want my viewport objects to have the shape of an array i.e. dim() should
+return the dimensions of the sub-array delimitted by the viewport.
+
+## A close look at some core Bioconductor classes
+
+### GRangesList
+
+TODO
+
+### RangedSummarizedExperiment
+
+TODO
+
+### GPos
+
+TODO
+
+### ArrayGrid
+
+TODO
+
+## Efficiency
+
+TODO
+
+## Common 'tricks'
+
+TODO
+
+## Documenting an S4 class
+
+TODO
+
+## A note on long vectors
+
+TODO
+
+## Links
+
+TODO
+
