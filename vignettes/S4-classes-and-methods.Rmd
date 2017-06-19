@@ -162,7 +162,6 @@ setValidity("SNPLocations",
 )
 
 setMethod("length", "SNPLocations", function(x) length(x@snpid))
-
 ```
 
 - Call `new("SNPLocations")`. What happens? Does this look right?
@@ -402,8 +401,8 @@ NOT endomorphisms:
   not endomorphisms:
 
 ```{r}
-    gpos <- GPos(c("chr1:4-20", "chr1:50-60"))
-    reduce(gpos)
+gpos <- GPos(c("chr1:4-20", "chr1:50-60"))
+reduce(gpos)
 ```
 
 ### Transformation that preserve positionality
@@ -419,31 +418,33 @@ NOT endomorphisms:
 
 ## Reusing existing classes
 
-- It's very likely that Bioconductor already has a container that handles
-    the kind of data that your package needs to handle.
+It's very likely that Bioconductor already has a container that handles
+the kind of data that your package needs to handle.
 
-- If not, then maybe extending an existing class by adding a few slots
-    is all you need to do.
+If not, then maybe extending an existing class by adding a few slots
+is all you need to do.
 
-- Starting a new class from scratch should be the last resort.
-    Even in that case, it's very likely that you could extend one of the
-    virtual classes that are at the bottom of our core class hierarchy.
-    For example:
+Starting a new class from scratch should be the last resort.
+Even in that case, it's very likely that you could extend one of the
+virtual classes that are at the bottom of our core class hierarchy.
 
-- by extending Annotated you get the metadata() getter and setter
-      out-of-the-box.
+For example:
 
-- by extending Vector (only if your objects are vector-like objects),
-      you get the above (Vector extends Annotated) + length() + the
-      mcols() getter and setter out-of-the box + a mechanism to facilitate
-      implemention of subsetting ([) and validation (via defining a
-      "parallelSlotNames" method).
+- By extending the Annotated class you get the `metadata()` getter and setter
+  out-of-the-box.
 
-- by extending List (only if your objects are list-like objects)
-      you get the above (List extends Vector) + elementType() + as.list() +
-      a mechanism to facilitate implementation of [[.
+- By extending the Vector class (only if your objects are vector-like objects),
+  you get the above (Vector extends Annotated) + `length()` + the `mcols()`
+  getter and setter out-of-the box + access to a mechanism that facilitates
+  implemention of subsetting (`[`) and validation (via defining a
+  `"parallelSlotNames"` method).
 
-- Ask on the bioc-devel mailing list if you are not sure.
+- By extending List (only if your objects are list-like objects) you get all
+  the above (List extends Vector) + `elementType()` + `as.list()` + access to
+  a mechanism to facilitate implementation of `[[`.
+
+Ask on the bioc-devel mailing list if you need help to find a class that
+you could extend.
 
 **Exercise**
 
