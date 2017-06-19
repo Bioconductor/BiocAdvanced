@@ -13,7 +13,10 @@ output:
 
 # Preamble
 
-S4 class system implemented in the methods package
+
+## The `methods` package
+
+S4 class system implemented in the `methods` package
 
 The ingredients:
 
@@ -24,11 +27,11 @@ The ingredients:
 S4 classes are sometimes called _formal classes_
 
 The result: a rich and complex system (218 symbols exported from the
-methods package). Can be overwhelming. The good news is that we only need
+`methods` package). Can be overwhelming. The good news is that we only need
 a small subset of the system.
 
 
-# Strengths of S4 (compared to S3)
+## Strengths of S4 (compared to S3)
 
 **Multiple dispatch**
 
@@ -125,7 +128,7 @@ guaranteed to leave the original object unmodified. Pass-by-reference
 semantic is almost never needed and should be avoided.
 
 
-# A first example
+## A first example
 
 Open _A quick overview of the S4 class system_ (PDF) on the
 [S4Vectors landing page][S4Vectors_canonical_url] and go to the
@@ -185,7 +188,7 @@ setClass("SNPLocations",
 # Design and implementation of S4 objects
 
 
-## 2 approaches
+## Two approaches
 
 - From scratch (a rare situation)
 
@@ -210,9 +213,9 @@ setClass("SNPLocations",
 **At a minimum some getters** Try to reuse existing generics instead of
 introducing new ones e.g.:
 
-- `organism()`, `score()`, `strand()` (defined in BiocGenerics)
+- `organism()`, `score()`, `strand()` (defined in `BiocGenerics`)
 
-- `genome()`, `seqinfo()` (defined in GenomeInfoDb)
+- `genome()`, `seqinfo()` (defined in `GenomeInfoDb`)
 
 **Depending on the _shape_ of the objects, methods for some of the following core generic functions** (from base R):
 
@@ -225,7 +228,7 @@ introducing new ones e.g.:
 - Methods for some of `names<-`, subassignment (`[<-`, `[[<-`), `dimnames<-`
 
 **Specialized operations** As methods for existing generics (e.g. `normalize`
-defined in BiocGenerics), or as new generics.
+defined in `BiocGenerics`), or as new generics.
 
 ### Coercion methods
 
@@ -247,9 +250,8 @@ Most objects fall in one of these categories
 
 - vector-like: length()
 
-  Examples: atomic vectors and ordinary list in base R
-                  Rle, Hits, IRanges, GRanges, GRangesList, DNAString,
-                  DNAStringSet
+  Examples: atomic vectors and ordinary list in base R; Rle, Hits, IRanges,
+  GRanges, GRangesList, DNAString, DNAStringSet objects
 
 - list-like: vector-like + [[
 
@@ -260,7 +262,8 @@ Most objects fall in one of these categories
 - matrix-like, array-like objects: dim() and length(x) = prod(dim(x))
 
   Examples: matrix and array objects in base R, Matrix objects in the
-            Matrix package, DelayedArray objects
+            `Matrix` package, DelayedArray objects in the `DelayedArray`
+            package
 
 - data-frame-like: dim() + list-like along the columns
 
@@ -566,6 +569,15 @@ It all depends!  MORE ON THIS...
 I want my viewport objects to have the shape of an array i.e. dim() should
 return the dimensions of the sub-array delimitted by the viewport.
 
+## Documenting the class
+
+TODO
+
+## ArrayGrid objects dissected
+
+TODO
+
+
 # A close look at some core Bioconductor classes
 
 ## GRangesList
@@ -576,31 +588,31 @@ TODO
 
 TODO
 
-## GPos
-
-TODO
-
-## ArrayGrid
-
-TODO
 
 # Efficiency
 
 TODO
 
-# Common 'tricks'
+## Common 'tricks'
 
 TODO
 
-# Documenting an S4 class
 
-TODO
+# Resources
 
-# A note on long vectors
+- Man pages in the `methods` package: `?setClass`, `?showMethods`,
+  `?selectMethod`, `?getMethod`, `?is`, `?setValidity`, `?setMethod`,
+  `?setReplaceMethod`, `?as`, `?setAs`
 
-TODO
+- Note: S4 is NOT covered in the _An Introduction to R_ or
+  _The R language definition_ manuals (both available on CRAN
+  [here][manuals_url])
 
-# Links
+[manuals_url]: http://cran.r-project.org/manuals.html
 
-TODO
+- The _Writing R Extensions_ manual for some details about integrating
+  S4 classes to a package
+
+- The _Extending RangedSummarizedExperiment_ section of the
+  _SummarizedExperiment_ vignette in the `SummarizedExperiment` package
 
