@@ -345,7 +345,7 @@ Different types of subsetting:
 
 - **_Single-bracket_** vs **_double-bracket_**
     - _Single-bracket_: `[`
-    - _Double-bracket_: `[[` (sometimes called _list style subsetting_).
+    - _Double-bracket_: `[[` (sometimes called _list-style subsetting_).
 
 - **_Linear_** vs **_multi-dimensional_**
     - _Linear_: only 1 subscript is used: `x[i]` or `x[[i]]`. Sometimes called
@@ -428,8 +428,8 @@ Also pay attention to 2 properties that are considered good properties:
 ### Transformations that preserve positionality
 
 Positionality is preserved when the output is _parallel_ to the input, that
-is, has the same length as the input and its i-th element corresponds to the
-i-th element in the input.
+is, it has the same length as the input and its i-th element corresponds to
+the i-th element in the input.
 
 Examples:
 
@@ -444,6 +444,9 @@ Examples:
       Vectorized with respect to the **longest operand**.
 
     - `match()`, `%in%` (with respect to the 1st argument)
+
+- `seqnames()`, `start()`, `end()`, `width()`, `strand()` getters on a
+  GRanges or GRangesList object.
 
 - _**Intra**-range transformations_ in Bioconductor (e.g. `shift()`,
   `flank()`, ...)
@@ -463,8 +466,10 @@ Do NOT preserve positionality:
 
 - `grep()`, `sort()`, `order()`
 
-- Summarization functions e.g. `min()`, `max()`, `sum()`, `mean()`, `prod`,
-  `rowSums()`, ... (but `pmin()` and `pmax()` do)
+- Summarization functions on atomic vectors e.g. `min()`, `max()`, `sum()`,
+  `mean()`, `prod()`, `all()`, `any()`, ...
+  However they DO preserve positionality when applied to NumericList or
+  LogicalList objects from Bioconductor!
 
 - Set operations e.g. `union()`, `intersect()`, ...
 
@@ -476,6 +481,15 @@ reduce(gr)
 ```
 
 These operations do NOT propagate the names or metadata columns.
+
+**Exercise**
+
+Try `unique()`, `sort()`, `order()` on NumericList, CharacterList, and
+RleList objects.
+
+How do you extract the unique values **object-wise**?
+
+Count the values in a NumericList object that are greater than a given value.
 
 ### To be or not to be an endomorphism
 
@@ -516,11 +530,38 @@ reduce(gpos)
 
 ## Reusing existing classes
 
-It's very likely that Bioconductor already has a container that handles
-the kind of data that your package needs to handle.
+It's very likely that Bioconductor already has a container suited
+for the kind of data that you want to handle in your package.
+
+If your data is rectangular, the first choice would be SummarizedExperiment.
 
 If not, then maybe extending an existing class by adding a few slots
 is all you need to do.
+
+Many packages have already done this with SummarizedExperiment e.g.:
+
+- `DESeq2` with the DESeqDataSet and DESeqTransform containers
+
+- `minfi` with the MethylSet, RGChannelSet, RatioSet, GenomicMethylSet,
+  and GenomicRatioSet containers
+
+- `VariantAnnotation` with the VCF class.
+
+- `InteractionSet` with the InteractionSet container.
+
+- `GenomicFiles` with the GenomicFiles container.
+
+- `SGSeq` with the SGVariantCounts and SGFeatureCounts containers.
+
+- `AllelicImbalance` with the ASEset, RiskVariant, RegionSummary, DetectedAI,
+  and LinkVariantAlmlof containers.
+
+- and many more...
+
+Ask on the [bioc-devel][bioc_devel_url] mailing list if you need help
+finding the right container for your data (to use as-is or to extend).
+
+[bioc_devel_url]: https://bioconductor.org/help/support/#bioc-devel
 
 Starting a new class from scratch should be the last resort.
 Even in that case, it's very likely that you could extend one of the
@@ -532,17 +573,21 @@ For example:
   out-of-the-box.
 
 - By extending the Vector class (only if your objects are vector-like objects),
-  you get the above (Vector extends Annotated) + `length()` + the `mcols()`
-  getter and setter out-of-the box + access to a mechanism that facilitates
-  implemention of subsetting (`[`) and validation (via defining a
-  `"parallelSlotNames"` method).
+  you get the above (Vector extends Annotated), plus:
+    - `length()` out-of-the box
+    - `mcols()` getter and setter out-of-the box
+    - Validation of the `parallel slots` almost out-of-the box (via
+      definition of a `"parallelSlotNames"` method)
+    - Automatic subsetting of the `parallel slots` if you decide that
+      your object should support subsetting
 
-- By extending List (only if your objects are list-like objects) you get all
-  the above (List extends Vector) + `elementType()` + `as.list()` + access to
-  a mechanism to facilitate implementation of `[[`.
-
-Ask on the bioc-devel mailing list if you need help to find a class that
-you could extend.
+- By extending the List class (only if your objects are list-like objects),
+  you get all the above (List extends Vector), plus:
+    - `elementType()` almost out-of-the box (via adding a prototype in your
+      class definition)
+    - `as.list()` out-of-the box
+    - access to a mechanism that facilitates implementation of list-style
+      subsetting (`[[` and `[[<-`).
 
 **Exercise**
 
