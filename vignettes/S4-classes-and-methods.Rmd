@@ -361,7 +361,7 @@ Different types of subsetting:
       _right value_ or _replacement value_. This form of subsetting calls
       the `[<-` or `[[<-` operators. Sometimes called _subassignment_.
 
-R syntax allows any combination of these types:
+R syntax allows any combination of these types e.g.:
 
 - `y <- x[i, j, k]`: Single-bracket multi-dimensional subsetting
 
@@ -412,53 +412,106 @@ Implement it.
 
 ## About API design
 
-- Avoid surprising the user
+### General recommendations
 
-- Pay particular attention to how `length()`, `names()`, `[`, `[[`, c(), `dim()`, `dimnames()` behave
+Avoid surprising the user.
 
-### To be or not to be an endomorphism?
+Pay particular attention to how `length()`, `names()`, `[`, `[[`, `c()`,
+`dim()`, and `dimnames()` behave.
+
+Also pay attention to 2 properties that are considered good properties:
+
+- Should the transformation I'm implementing preserve positionality?
+
+- Should it behave like an endomorphism?
+
+### Transformations that preserve positionality
+
+Positionality is preserved when the output is _parallel_ to the input, that
+is, has the same length as the input and its i-th element corresponds to the
+i-th element in the input.
 
 Examples:
 
-- `[` (drop=FALSE) (except linear subsetting on an array-like object)
+- All the operations in base R that are said to be _vectorized_ e.g.:
+
+    - `is.na()`, `duplicated()`, `nchar()`, `chartr()`, `tolower()`,
+      `grepl()`, `regexpr()`, `rank()`
+
+    - Functions from the `Math` group: `log()`, `sqrt()`, `cumsum()`, ...
+
+    - Binary operators: `+`, `-`, `*`, `/`, `^`, `==`, `<`, `&`, `|`, ...
+      Vectorized with respect to the **longest operand**.
+
+    - `match()`, `%in%` (with respect to the 1st argument)
+
+- _**Intra**-range transformations_ in Bioconductor (e.g. `shift()`,
+  `flank()`, ...)
+
+```{r}
+gr <- GRanges(c("chr1:51-70", "chr1:75-100", "chr1:6-55"))
+gr
+shift(gr, 1000)
+```
+
+These operations typically _propagate_ the names.
+
+Also expected to propagate the metadata columns when applied to
+Bioconductor objects.
+
+Do NOT preserve positionality:
+
+- `grep()`, `sort()`, `order()`
+
+- Summarization functions e.g. `min()`, `max()`, `sum()`, `mean()`, `prod`,
+  `rowSums()`, ... (but `pmin()` and `pmax()` do)
+
+- Set operations e.g. `union()`, `intersect()`, ...
+
+- _**Inter**-range transformations_ in Bioconductor (e.g. `reduce()`,
+  `disjoin()`, ...) do not preserve positionality in general:
+
+```{r}
+reduce(gr)
+```
+
+These operations do NOT propagate the names or metadata columns.
+
+### To be or not to be an endomorphism
+
+An _endomorphism_ is a transformation that preserves the class of the object.
+
+Examples:
+
+- `[` (when `drop=FALSE`), except linear subsetting on an array-like object
 
 - Replacement methods: `[<-` and `[[<-` and other setters (e.g. `names<-`,
-  `mcols<-`, `seqinfo<`, etc...)
- 
-  But with some notable exceptions:
+  `mcols<-`, `seqinfo<`, ...) With some notable exceptions:
 
-  - [<- on an atomic vector when the storage.mode of the vector cannot
-    represent the right-value (e.g. x[2] <- 3.4 on an integer vector,
-    or x[2] <- "a" on a numeric vector)
+    - `[<-` on an atomic vector when the storage.mode of the vector cannot
+      represent the right-value (e.g. `x[2] <- 3.75` on an integer vector,
+      or `x[2] <- "a"` on a numeric vector)
 
-  - rowRanges() setter on a SummarizedExperiment instance.
+    - `rowRanges()` setter on a SummarizedExperiment instance.
 
-- c() on linear objects (e.g. on Hits, GRanges, GRangesList,
-        DNAStringSet objects)
+- `c()` on linear objects (e.g. on Hits, GRanges, GRangesList, DNAStringSet
+   objects, ...) With a notable exception on factors (this is bad!)
 
-- Intra-range transformations (e.g. shift(), flank(), etc...)
+- `rbind()` and `cbind()` on rectangular objects
+
+- _**Intra**-range transformations_
 
 NOT endomorphisms:
 
-- c() on array-like objects
+- `c()` on array-like objects
 
-- Inter-range transformations (e.g. `reduce()`, `disjoin()`) in general are
-  not endomorphisms:
+- _**Inter**-range transformations_ are not endomorphisms in general:
 
 ```{r}
-gpos <- GPos(c("chr1:4-20", "chr1:50-60"))
+gpos <- GPos(gr)
+gpos
 reduce(gpos)
 ```
-
-### Transformation that preserve positionality
-
-- Output "parallel" to input
-
-  EXPLAIN
-
-- Propagation of names and metadata columns
-
-- Can or be an endomorphism (ismorphism) or not
 
 
 ## Reusing existing classes
