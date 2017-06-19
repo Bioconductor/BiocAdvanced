@@ -6,7 +6,7 @@ vignette: >
   %\VignetteIndexEntry{Vignette Title}
   %\VignetteEngine{knitr::rmarkdown}
 output: 
-  BiocStyle::html_document2
+  BiocStyle::html_document
 ---
 
 
@@ -337,18 +337,47 @@ What's the shape of SNPLocations objects?
 
 ## Subsetting
 
-R syntax allows 8 different forms of subsetting:
+Subsetting is a powerful and very flexible operation in R.
 
-- [ vs [[
+4 subsetting operators: `[`, `[[`, `[<-`, `[[<-`
 
-- Linear (x[i] and x[[i]], also called 1D-style subsetting) vs
-  multi-dimensional (x[i_1, i_2, ..., i_n], x[[...]])
-  Linear subsetting is along the length of the object
-  (1 <= i <= length(x))
+Different types of subsetting:
 
-- Extraction ([, [[) vs replacement ([<-, [[<-) (a.k.a. "subassignment")
+- **_Single-bracket_** vs **_double-bracket_**
+    - _Single-bracket_: `[`
+    - _Double-bracket_: `[[` (sometimes called _list style subsetting_).
 
-=> 2 x 2 x 2 = 8 forms of subsetting
+- **_Linear_** vs **_multi-dimensional_**
+    - _Linear_: only 1 subscript is used: `x[i]` or `x[[i]]`. Sometimes called
+      _1D-style subsetting_.
+    - _Multi-dimensional_: more than 1 subscript is used:
+      `x[i_1, i_2, ..., i_n]` or `x[[i_1, i_2, ..., i_n]]`.
+      Some (or all) subscripts can be missing e.g. `x[ , 3, ]`.
+
+- **_Extraction_** vs **_replacement_**
+    - _Extraction_: `y <- x[...]` or `y <- x[[...]]`
+    - _Replacement_: `x[...] <- value` or `x[[...]] <- value`. Subsetting
+      is on the **left side** of the assignment. `value` is called the
+      _right value_ or _replacement value_. This form of subsetting calls
+      the `[<-` or `[[<-` operators. Sometimes called _subassignment_.
+
+R syntax allows any combination of these types:
+
+- `y <- x[i, j, k]`: Single-bracket multi-dimensional subsetting
+
+- `x[i] <- value`: Single-bracket linear subassignment
+
+- `x[[i, j]] <- value`: Double-bracket two-dimensional subassignment
+
+- etc...
+
+==> 8 possible combinations.
+
+Even though all these forms are _syntactically_ valid, they don't necessarily
+make sense for all objects (and they should fail in that case).
+
+For multi-dimensional objects that support it, linear subsetting is expected
+to be along the backbone of the object (`1 <= i <= length(x)`).
 
 Some examples:
 
@@ -356,16 +385,29 @@ Some examples:
   Gotcha: Implicit linear shape of matrix-like and data-frame-like objects
   differ, and so do linear subsetting on them.
 
-- SummuarizedExperiment objects support rectangular (x[i, j]) and linear
-  (x[i]) subsetting. x[i] is equivalent to x[i, ].
-  Plus their replacement versions.
-  Gotcha: [[ is also supported but behaves in a non-standard way!
+- SummuarizedExperiment objects support rectangular (`x[i, j]`) and linear
+  (`x[i]`) subsetting and their replacement versions.
+  `x[i]` and `x[i] <- value` are equivalent to `x[i, ]` and `x[i, ] <- value`,
+  respectively.
+  Gotcha: `[[` is also supported but behaves in a non-standard way!
 
-- GRanges objects support linear [ and [<- only
+- GRanges objects support linear `[` and `[<-`.
+  As a convenience, rectangular subsetting is also supported (even though
+  GRanges objects are NOT rectangular).
 
 **Exercise**
 
-Implement subsetting of SNPLocations objects.
+Find the general man page for subsetting in base R.
+
+Find the specific man page for subsetting a data frame.
+
+Look at the signatures of the `[`, `[[`, `[<-`, and `[[<-` generic functions.
+
+**Exercise**
+
+What form of subsetting SNPLocations objects would naturally support?
+
+Implement it.
 
 
 ## About API design
