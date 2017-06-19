@@ -1,5 +1,5 @@
 ---
-title: "Nouns and verbs"
+title: "S4 classes and methods"
 author: "Martin Morgan, Hervé Pagès"
 date: "June 19 - 20, 2017"
 vignette: >
@@ -11,207 +11,142 @@ output:
 
 
 
-# _R_ data (classes) and programs (functions and methods)
-
-## Building blocks
-
-```{r}
-x <- rnorm(1000)
-y <- x + rnorm(1000)
-df <- data.frame(Independent = x, Dependent = y)
-fit <- lm(Dependent ~ Independent, df)
-anova(fit)
-```
-
-Atomic vectors
-
-- `logical()`, `integer()`, `numeric()`, `complex()`, `raw()`, `character()`
-
-Attributes
-
-- Attributes in C
-
-An implicit class -- `matrix()`
-
-`list()` and `environment()`
-
-- recursive
-- `environment()`: reference semantics
-
-Plain-old-functions
-
-- First class objects
-
-## S3
-
-Class
-
-- Definition -- list (usually) or atomic vector with `class` attribute
-- Inheritance: _is-a_ and _has-a_
-    - linear hierarchy
-
-```{r}
-People <- function(name = character(), age = character()) {
-    stopifnot(
-        is.character(name), is.numeric(age), length(name) == length(age)
-    )
-    structure(list(name=name, age=age), class = "People")
-}
-
-Employees <- function(people = People(), job = character()) {
-    stopifnot(
-        identical(class(people), "People"), is.character(job),
-        length(people) == length(job)
-    )
-    employees <- people
-    employees$job <- job
-    class(employees) <- c("Employees", class(employees))
-    employees
-}
-
-Company <- function(company_name = character(), empolyees = Employees()) {
-    stopifnot(
-        is.character(company_name), length(company_name) == 1L,
-        !is.na(company_name),
-        inherits(employees, "Employees")
-    )
-    structure(
-        list(
-            company_name = company_name, 
-            employees = employees
-        ),
-        class = "Company"
-    )
-}
-```
-
-Generic
-
-- 'Group' generics
-
-Method
-
-- 'Next' methods
-
-Formal characteristics
-
-- Strengths & weakneses
-
-### Exercises
-
-**Exercise:** `length()` S3 method
-
-`?length` indicates that this function is a (S3) generic. Define an S3
-`length` method for the `People` class; note that we use this when
-validating the input to `Employees()`.
-
-**Exercise:** `name()` and `age()` accessors
-
-The `Person` class has fields `name` and `age`. These are accessible
-by reaching in to the implementation details and extracting the list
-element, e.g., `Person()$name`. But this type of direct manipulation
-is considered bad practice; it is better to have 'accessors' that
-define the 'application programming interface (API)' for accessing
-information from the object. Write plain-old-functions (e.g., like
-`name <- function(x) ...`) to extract name and age.
-
-**Exercise:** S3 generics and methods
-
-Revise `name()` and `age()` to be S3 generics and methods. Reflect on
-the beneifts and costs of plain-old-functions versus generic +
-methods.
-
-## S4
-
-### Preamble
+# Preamble
 
 - S4 class system implemented in the methods package
 
 - S4 classes are sometimes called _formal classes_
 
-### Strength of S4 (compared to S3)
 
-- multiple dispatch
 
-- validity
+# Strengths of S4 (compared to S3)
 
-- virtual/concrete classes
+**Multiple dispatch**
 
-- virtual classes with no slots (equiv to Java interface)
+**Object validation**
 
-- multiple inheritance: to be used carefully. Typical use case is to
-  put more than 1 interface on top of a class by having it inherit
-  1 or more virtual classes with no slots
+**Virtual/concrete classes** A _virtual_ class is a class that cannot be
+_instanciated_. Typically used as the parent of one or more concrete classes:
 
-- class unions (just a special kind of virtual class with no slots)
+    setClass("A", representation("VIRTUAL"))  # virtual class
+    setClass("A1", contains="A", slots=some slots)
+    setClass("A2", contains="A", slots=some other slots)
 
-- what about reference classes? they are rarely needed.
-  As a general principle, R objects should have a pass-by-copy semantic
-  so passing them to a function is guaranteed to leave the original object
-  unmodified. Pass-by-reference semantic is almost never needed and should
-  be avoided.
-
-- What you see and feel is not what's inside:
-
-- API vs internals: the Bioconductor approach to S4 object implementation
-  is to hide what an object really contains from the end user. The slots
-  and what they contain are called the _internals_ of the object and should
-  not matter to the end user. What matters is the _semantic_ of an object
-  i.e. _what_ it represents and how it can be manipulated (API).
-
-- Even developers who implement a new class by extending an existing class
-  should try to do it in a way that is as agnostic as possible.
-
-- Despite it's reputation, not overly verbose compared to
-  well-structured S3 classes
-
-### Example
+For example the GRanges and GPos classes are both subclasses of virtual class
+GenomicRanges:
 
 ```{r}
-People <- setClass(
-    "People",
-    slots = c(name = "character", age = "numeric")
-)
-
-setValidity("People", function(object) {
-    if (!identical(length(name(object)), length(age(object)))) {
-        "lengths of name() and age() differ"
-    } else TRUE
-})
-
-Employees <- setClass(
-    "Employees", 
-    contains = "People",
-    slots = c(job = "character")
-)
-
-setValidity("Employees", function(object) {
-    if (!identical(length(employees(object)), length(jobs(object)))) {
-        "length of employee() and job() differ"
-    } else TRUE
-})
-
-Company <- setClass(
-    "Company",
-    slots = c(company_name = "character", employee = "Employees")
-)
-
-setValidity("Company", function(object) {
-    if (length(company_name) != 1 || !is.na(company_name)) {
-        "company_name must be length 1 and not NA"
-    } else TRUE
-})
+suppressPackageStartupMessages(library(GenomicRanges))
+showClass("GenomicRanges")
 ```
 
-## Classes, generics, and methods
+Many methods can be implemented in a way that works for the 2 kinds of
+objects.
+
+`"names"` method:
+
+```{r}
+selectMethod("names", "GRanges")
+```
+
+Will also work on GPos objects because the `ranges()` getter works on these
+objects (and like for GRanges objects, it also returns a names IRanges object).
+So instead of defining 2 `"names"` methods (one for GRanges and one for GPos
+objects) we define one method for GenomicRanges objects. GRanges and GPos
+objects inherit it.
+
+**Virtual classes with no slots** A virtual class can have slots (like
+GenomicRanges), or no slots (like class A in our first example).
+Typically the slots of a virtual class are not enough to represent
+an object (this is why the class is made virtual). The concrete subclasses
+add the missing slots.
+
+**Multiple inheritance** Powerful but can lead to a class hierarchy that is
+very hard to maintain if not used carefully.
+
+```{r}
+showClass("CompressedIRangesList")
+```
+
+S4 imposes no restrictions but I think we never had the need to define
+a class with more than 2 direct parents.
+
+**Class unions** Just a special kind of virtual class with no slots.
+
+```{r}
+showClass("GenomicRanges_OR_GRangesList")
+```
+
+(This class is used in the definition of RangedSummarizedExperiment objects.)
+
+**Reference classes** Rarely needed. As a general principle, R objects
+should have a pass-by-copy semantic so passing them to a function is
+guaranteed to leave the original object unmodified. Pass-by-reference
+semantic is almost never needed and should be avoided.
+
+**API vs internals** The Bioconductor approach to S4 object implementation
+is to hide what an object really contains from the end user. The slots
+and what they contain are called the _internals_ of the object and should
+not matter to the end user. What matters is the _semantic_ of an object
+i.e. what it represents and how it can be manipulated (API).
+This separation between what an object looks from the outside and what's
+really inside is a powerful concept. More on this later.
+
+Even developers who implement a new class by extending an existing class
+should do it in a way that is agnostic about the internals of the class
+they extend. More on this later.
+
+**Powerful coercion system**
+
+
+
+# A first example
+
+S4 versions of the People/Employees/Company classes:
+
+```{r, results="hide"}
+setClass("People", slots=c(name="character", age="numeric"))
+
+setValidity("People",
+    function(object)
+    {
+        if (!identical(length(object@name), length(object@age)))
+            return("'name' and 'age' slots must have the same length")
+        TRUE
+    }
+)
+
+setClass("Employees", contains="People", slots=c(job="character"))
+
+setValidity("Employees",
+    function(object)
+    {
+        if (!identical(length(object@name), length(object@job)))
+            return("'name' and 'job' slots must have the same length")
+        TRUE
+    }
+)
+
+setClass("Company", slots=c(company_name="character", employees="Employees"))
+
+setValidity("Company",
+    function(object)
+    {
+        if (length(object@company_name) != 1 || is.na(object@company_name))
+            return("'company_name' slot must be a single non-NA string")
+        TRUE
+    }
+)
+```
+
+
+# Classes, generics, and methods
 
 Class
 
 - Definition
 - Inheritance
 - Virtual classes
-- Class unions
-- Discovery, e.g., `getClass()`
 
 Generic
 
@@ -243,19 +178,17 @@ Developers
 
 
 
-# Design and implementation of S4 classes
+# Design and implementation of S4 objects
 
-## Implementing an S4 class
+## 2 approaches
 
-### 2 approaches
+- From scratch (a rare situation)
 
 - Extend an existing class (less work)
 
-- Sometimes from scratch (a rare situation)
+## What to implement
 
-### What to implement
-
-#### Core stuff
+### Core stuff
 
 - class def
 
@@ -265,33 +198,34 @@ Developers
 
 - show method
 
-#### API
+### API
 
-- At a minimum some accessors (getters). Try to reuse existing
-  generics instead of introducing new ones e.g.:
-    - organism, score (defined in BiocGenerics), strand
-    - seqinfo (defined in GenomeInfoDb)
+**At a minimum some getters** Try to reuse existing generics instead of
+introducing new ones e.g.:
 
-- Plus, depending on the "shape" of the objects, methods for some
-  of the core generic functions in base R:
+- organism, score (defined in BiocGenerics), strand
+
+- seqinfo (defined in GenomeInfoDb)
+
+**Depending on the _shape_ of the objects, methods for some of the following core generic functions** (from base R):
 
     length, names, subsetting ([, [[), dim, dimnames, c(),
     setters, names<-, subassignment ([<-, [[<-), dimnames<-
 
-- Specialized operations: as methods for existing generics
-  (e.g. normalize, defined in BiocGenerics) or for new generics.
+**Specialized operations** As methods for existing generics (e.g. `normalize`
+defined in BiocGenerics), or as new generics.
 
-#### Coercion methods
-
-TODO (give examples)
-
-#### Subtle difference between being an "A instance" and an "A object"
+### Coercion methods
 
 TODO (give examples)
 
-## On designing an API
+### Subtle difference between being an "A instance" and an "A object"
 
-### Avoid surprises
+TODO (give examples)
+
+## On API design
+
+### Avoid surprising the user
 
 TODO (give examples)
 
@@ -605,41 +539,41 @@ It all depends!  MORE ON THIS...
 I want my viewport objects to have the shape of an array i.e. dim() should
 return the dimensions of the sub-array delimitted by the viewport.
 
-## A close look at some core Bioconductor classes
+# A close look at some core Bioconductor classes
 
-### GRangesList
-
-TODO
-
-### RangedSummarizedExperiment
+## GRangesList
 
 TODO
 
-### GPos
+## RangedSummarizedExperiment
 
 TODO
 
-### ArrayGrid
+## GPos
 
 TODO
 
-## Efficiency
+## ArrayGrid
 
 TODO
 
-## Common 'tricks'
+# Efficiency
 
 TODO
 
-## Documenting an S4 class
+# Common 'tricks'
 
 TODO
 
-## A note on long vectors
+# Documenting an S4 class
 
 TODO
 
-## Links
+# A note on long vectors
+
+TODO
+
+# Links
 
 TODO
 

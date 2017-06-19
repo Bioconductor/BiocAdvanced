@@ -1,0 +1,123 @@
+---
+title: "S3 classes and methods"
+author: "Martin Morgan, Hervé Pagès"
+date: "June 19 - 20, 2017"
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document2
+---
+
+
+
+# _R_ data (classes) and programs (functions and methods)
+
+## Building blocks
+
+```{r}
+x <- rnorm(1000)
+y <- x + rnorm(1000)
+df <- data.frame(Independent = x, Dependent = y)
+fit <- lm(Dependent ~ Independent, df)
+anova(fit)
+```
+
+Atomic vectors
+
+- `logical()`, `integer()`, `numeric()`, `complex()`, `raw()`, `character()`
+
+Attributes
+
+- Attributes in C
+
+An implicit class -- `matrix()`
+
+`list()` and `environment()`
+
+- recursive
+- `environment()`: reference semantics
+
+Plain-old-functions
+
+- First class objects
+
+## S3
+
+Class
+
+- Definition -- list (usually) or atomic vector with `class` attribute
+- Inheritance: _is-a_ and _has-a_
+    - linear hierarchy
+
+```{r}
+People <- function(name = character(), age = character()) {
+    stopifnot(
+        is.character(name), is.numeric(age), length(name) == length(age)
+    )
+    structure(list(name=name, age=age), class = "People")
+}
+
+Employees <- function(people = People(), job = character()) {
+    stopifnot(
+        identical(class(people), "People"), is.character(job),
+        length(people) == length(job)
+    )
+    employees <- people
+    employees$job <- job
+    class(employees) <- c("Employees", class(employees))
+    employees
+}
+
+Company <- function(company_name = character(), empolyees = Employees()) {
+    stopifnot(
+        is.character(company_name), length(company_name) == 1L,
+        !is.na(company_name),
+        inherits(employees, "Employees")
+    )
+    structure(
+        list(
+            company_name = company_name, 
+            employees = employees
+        ),
+        class = "Company"
+    )
+}
+```
+
+Generic
+
+- 'Group' generics
+
+Method
+
+- 'Next' methods
+
+Formal characteristics
+
+- Strengths & weakneses
+
+### Exercises
+
+**Exercise:** `length()` S3 method
+
+`?length` indicates that this function is a (S3) generic. Define an S3
+`length` method for the `People` class; note that we use this when
+validating the input to `Employees()`.
+
+**Exercise:** `name()` and `age()` accessors
+
+The `Person` class has fields `name` and `age`. These are accessible
+by reaching in to the implementation details and extracting the list
+element, e.g., `Person()$name`. But this type of direct manipulation
+is considered bad practice; it is better to have 'accessors' that
+define the 'application programming interface (API)' for accessing
+information from the object. Write plain-old-functions (e.g., like
+`name <- function(x) ...`) to extract name and age.
+
+**Exercise:** S3 generics and methods
+
+Revise `name()` and `age()` to be S3 generics and methods. Reflect on
+the beneifts and costs of plain-old-functions versus generic +
+methods.
+

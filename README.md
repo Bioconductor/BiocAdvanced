@@ -23,16 +23,21 @@ Part 1: [Inside the mind of _R_][] (Day 1)
 - _R_ as we know it -- why it behaves the way it does
 - Inner _R_: understanding the _C_ API and implementation
 
-Part 2: [Nouns and verbs][] (Day 1 and 2)
+Part 2: [S3 classes and methods][] (Day 1)
 
-- _R_ data and programs: vectors, classes, functions and methods
+- _R_ data and programs (vectors, classes, functions and methods) -- the S3 way
+
+Part 3: [S4 classes and methods][] (Day 1 & 2)
+
+- _R_ data and programs (classes, functions and methods) -- the S4 way
 - Essential _Bioconductor_ classes: implementation and extension
 
-Part 3: [Doing it better][] (Day 2)
+Part 4: [Doing it better][] (Day 2)
 
 - Directions in _R_ and software development
 
 [Preparation]: vignettes/Preparation.Rmd
 [Inside the mind of _R_]: vignettes/Inside-R.Rmd
-[Nouns and verbs]: vignettes/Classes-and-methods.Rmd
+[S3 classes and methods]: vignettes/S3-classes-and-methods.Rmd
+[S4 classes and methods]: vignettes/S4-classes-and-methods.Rmd
 [Doing it better]: vignettes/Better.Rmd
