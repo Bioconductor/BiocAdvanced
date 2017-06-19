@@ -143,11 +143,19 @@ for (i in 1:n)
 
 <!--
 ```{r, eval = FALSE}
-x = 1L; .Internal(inspect(x))
+n = 5
+x = integer(); .Internal(inspect(x))
 for (i in 1:n) {
     x <- c(x, i)
     .Internal(inspect(x))
 }
+
+x = integer(); .Internal(inspect(x))
+for (i in 1:n) {
+    x[i] = i
+    .Internal(inspect(x))
+}
+x
 ```
 -->
 
@@ -189,7 +197,7 @@ for (i in 1:n) {
     m[1:2, 1] <- c(22.1, 22.2)
     ```
 
-## Correct, robust, fast: practical techniques
+## Correct, robust, simple, fast: practical techniques 
 
 Here's a simple function, implemented poorly
 
@@ -837,6 +845,7 @@ Development
   unit tests.
 - `devtools::document()` ([roxygen2][]) for documentation.
 - `devtools::test()` (run unit tests); `devtools::check()`
+- `devtools::install()`
 
 N.B.
 
