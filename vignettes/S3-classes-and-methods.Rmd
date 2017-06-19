@@ -5,7 +5,7 @@ date: "June 19 - 20, 2017"
 vignette: >
   %\VignetteIndexEntry{R data (classes) and programs (functions and methods)}
   %\VignetteEngine{knitr::rmarkdown}
-output: 
+output:
   BiocStyle::html_document2
 ---
 
@@ -31,7 +31,7 @@ attributes(x)
 .Internal(inspect(x))
 ```
 
-- Attributes in C
+- Attributes in C: pair list
 
 An implicit class -- `matrix()`
 
@@ -53,9 +53,10 @@ Class
     - linear hierarchy
 
 ```{r}
-People <- function(name = character(), age = character()) {
+People <- function(name = character(), age = numeric()) {
     stopifnot(
-        is.character(name), is.numeric(age), length(name) == length(age)
+        is.character(name), is.numeric(age), all(age > 0),
+        length(name) == length(age)
     )
     structure(list(name=name, age=age), class = "People")
 }
@@ -71,7 +72,7 @@ Employees <- function(people = People(), job = character()) {
     employees
 }
 
-Company <- function(company_name = character(), empolyees = Employees()) {
+Company <- function(company_name = character(), employees = Employees()) {
     stopifnot(
         is.character(company_name), length(company_name) == 1L,
         !is.na(company_name),
@@ -79,7 +80,7 @@ Company <- function(company_name = character(), empolyees = Employees()) {
     )
     structure(
         list(
-            company_name = company_name, 
+            company_name = company_name,
             employees = employees
         ),
         class = "Company"
@@ -98,13 +99,13 @@ Method
 
 ```{r}
 description.People <- function(object, ...)
-    paste0(object$name, "; age ", object$age)
+    sprintf("%s; age %s", object$name, object$age)
 
 description.Employees <-
     function(object, ...)
 {
     person_description <- NextMethod()
-    paste(person_description, "; job", object$job)
+    sprintf("%s; job %s", person_description, object$job)
 }
 ```
 
@@ -120,12 +121,6 @@ Strengths & weakneses
 
 # Exercises
 
-**Exercise:** `length()` S3 method
-
-`?length` indicates that this function is a (S3) generic. Define an S3
-`length` method for the `People` class; note that we use this when
-validating the input to `Employees()`.
-
 **Exercise:** `name()` and `age()` accessors
 
 The `Person` class has fields `name` and `age`. These are accessible
@@ -136,11 +131,56 @@ define the 'application programming interface (API)' for accessing
 information from the object. Write plain-old-functions (e.g., like
 `name <- function(x) ...`) to extract name and age.
 
+<!--
+Answer:
+
+```{r}
+name <- function(x)
+    x$name
+
+age <- function(x)
+    x$age
+```
+-->
+
+**Exercise:** `length()` S3 method
+
+`?length` indicates that this function is a (S3) generic. Define an S3
+`length` method for the `People` class; note that we use this when
+validating the input to `Employees()`.
+
+<!--
+Answer:
+
+```{r}
+length.People <- function(x)
+    length(name(x))
+```
+-->
+
 **Exercise:** S3 generics and methods
 
 Revise `name()` and `age()` to be S3 generics and methods. Reflect on
 the beneifts and costs of plain-old-functions versus generic +
 methods.
+
+<!--
+Answer:
+
+```{r}
+name <- function(x)
+    UseMethod("name")
+
+name.Person <- function(x)
+    x$name
+
+age <- function(x)
+    UseMethod("age")
+
+age.Person <- function(x)
+    x$age
+```
+-->
 
 **Exercise:** (Return here after S4 presentation)
 
@@ -149,6 +189,8 @@ S4. Compare and contrast. S4 is often viewed as verbose; is the S4
 implementation longer or more complicated than the S3 implementation?
 
 <!--
+Answer:
+
 ```{r}
 People <- setClass(
     "People",
@@ -162,7 +204,7 @@ setValidity("People", function(object) {
 })
 
 Employees <- setClass(
-    "Employees", 
+    "Employees",
     contains = "People",
     slots = c(job = "character")
 )
