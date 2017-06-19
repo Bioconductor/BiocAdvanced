@@ -5,7 +5,7 @@ date: "June 19 - 20, 2017"
 vignette: >
   %\VignetteIndexEntry{Vignette Title}
   %\VignetteEngine{knitr::rmarkdown}
-output: 
+output:
   BiocStyle::html_document2
 ---
 
@@ -13,10 +13,35 @@ output:
 
 ## Classic, tidy, rich data representations
 
+Simple example: classic vs. tidy
+
+```{r, message=FALSE}
+aggregate(hp ~ cyl, mtcars, mean)                     # classic
+library(tidyverse)
+mtcars %>% group_by(cyl) %>% summarize(hp = mean(hp)) # tidy
+```
+
+Biological example
+
+```{r, message=FALSE}
+library(airway)
+data(airway)
+airway                                   # rich
+hist(log10(rowMeans(assay(airway))))
+
+library(reshape2)
+library(tibble)
+tbl <- as_tibble(melt(
+    assay(airway), c("Gene", "Sample"), value.name="Count"
+))
+tbl                                      # tidy (incomplete -- no metadata)
+tbl %>% group_by(Gene) %>% summarize(mean(Count))
+```
+
 Context
 
 - Classic: sample x feature `data.frame()`.
-- Tidy: long-form `data.frame()`.
+- Tidy: long-form `data.frame()`; see the [tidyverse][]
 - Rich: domain-specific, object oriented.
 
 Vocabulary
@@ -47,15 +72,40 @@ Lessons learned / best practices
   convenience
 - Endomorphism, simple vocabulary, consistent paradigm aid use
 
+[tidyverse]: http://tidyverse.org/
+
 ## Scaling and performance
+
+```{r, message=FALSE}
+library(BiocFileCache)
+library(TENxGenomics)
+fl <- bfcrpath(BiocFileCache(), "1M_neurons_filtered_gene_bc_matrices_h5.h5")
+
+TENxGenomics(fl)                          # big!
+m = as.matrix(TENxMatrix(fl)[, 1:1000])   # first 1000 cells
+sum(m == 0) / length(m)                   # % zeros
+sum(rowSums(m == 0) == ncol(m)) / nrow(m) # % genes with no expression
+hist(log10(1 + colSums(m)))               # reads per cell
+```
 
 - Write efficient _R_ code first (10 - 100x speedup, often cleaner and
   more robust)
 - Scale to cores, cluster, cloud when needed
     - 10x (cores) - 100x (large clusters / clouds) 'faster'
     - 10x - 100x more complicated and fragile!
+- Large data requires different approach -- illusion of in-memory,
+  iteration
 
 ## Visualization, interactivity, ...
+
+```{r, message=FALSE}
+library(ggplot2)
+library(plotly)
+static <- mtcars %>% mutate(cyl = factor(cyl)) %>%
+    ggplot(aes(x=qsec, y=mpg)) +
+        geom_point(aes(color=cyl))
+ggplotly(static)
+```
 
 - [plotly][]`::ggplotly()` makes interactive visualization
   more-or-less a no-brainer.
@@ -117,14 +167,14 @@ Lessons learned / best practices
   solutions.
 - Effective [Rcpp][] use (given my current state of _R_'s C API)
   requires a deeper understanding of C++.
-  
+
 Pipes and lazy evaluation (e.g., [magrittr][], `%>%`)
 
 - No, not for robust code development.
 - Emphasizes 'endomorphisms' (function returns same object as first
   argument), which is probably good.
 
-S3 or S4 'reference' classes
+S3 classes or S4 'reference' classes
 
 - Only under limited circumstances.
 - S3: internal _and_ lightweight, or for interoperability.
@@ -132,7 +182,7 @@ S3 or S4 'reference' classes
   appropriate -- almost never with data objects; sometimes it seems
   like files and connections have reference-based semnatics, but I
   often try this and 'get it wrong'...
-  
+
 Other class systems
 
 - No, _R_ is weird enough.
