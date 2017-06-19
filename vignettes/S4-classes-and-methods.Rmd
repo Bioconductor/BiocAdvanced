@@ -13,10 +13,19 @@ output:
 
 # Preamble
 
-- S4 class system implemented in the methods package
+S4 class system implemented in the methods package
 
-- S4 classes are sometimes called _formal classes_
+The ingredients:
 
+- The core components: _classes_, _generic functions_ and _methods_
+
+- The glue: _method dispatch_
+
+S4 classes are sometimes called _formal classes_
+
+The result: a rich and complex system (218 symbols exported from the
+methods package). Can be overwhelming. The good news is that we only need
+a small subset of the system.
 
 
 # Strengths of S4 (compared to S3)
@@ -24,6 +33,37 @@ output:
 **Multiple dispatch**
 
 **Object validation**
+
+**API vs internals** Unlike other OO programming languages, S4 offers no
+provision for encapsulation: the _internals_ of an object (i.e. all its slots)
+are visible and directly accessible. However, the Bioconductor approach is
+to consider that the _internals_ are the business of the developer and
+that the end user should never need to access them directly or even look
+at them. Access should be only via _accessor functions_ (_getters_ or
+_setters_).
+
+This has the following advantages:
+
+- The developer has the freedom to modify the internals of an object
+without breaking user code.
+
+- Carefully crafted setters will make sure that the object remains valid
+when being modified by the user.
+
+- This separation between what an object looks from the outside and what's
+really inside allows the developer to use tricks at the internals
+level to make objects more compact in memory and/or more efficient.
+
+So from a user point of view what matters is the _semantic_ of an object
+i.e. what it represents and how it can be manipulated (API).
+
+Even developers who implement a new class by extending an existing class
+should do it in a way that is agnostic about the internals of the class
+they extend. S4 makes this possible (it's a great feature). More on this
+later.
+
+**Powerful coercion system**
+
 
 **Virtual/concrete classes** A _virtual_ class is a class that cannot be
 _instanciated_. Typically used as the parent of one or more concrete classes:
@@ -84,83 +124,14 @@ should have a pass-by-copy semantic so passing them to a function is
 guaranteed to leave the original object unmodified. Pass-by-reference
 semantic is almost never needed and should be avoided.
 
-**API vs internals** The Bioconductor approach to S4 object implementation
-is to hide what an object really contains from the end user. The slots
-and what they contain are called the _internals_ of the object and should
-not matter to the end user. What matters is the _semantic_ of an object
-i.e. what it represents and how it can be manipulated (API).
-This separation between what an object looks from the outside and what's
-really inside is a powerful concept. More on this later.
-
-Even developers who implement a new class by extending an existing class
-should do it in a way that is agnostic about the internals of the class
-they extend. More on this later.
-
-**Powerful coercion system**
-
-
 
 # A first example
 
-S4 versions of the People/Employees/Company classes:
+Open _A quick overview of the S4 class system_ (PDF) on the
+[S4Vectors landing page][S4Vectors_canonical_url] and go to the
+_Implementing an S4 class (in 4 slides)_ section.
 
-```{r, results="hide"}
-setClass("People", slots=c(name="character", age="numeric"))
-
-setValidity("People",
-    function(object)
-    {
-        if (!identical(length(object@name), length(object@age)))
-            return("'name' and 'age' slots must have the same length")
-        TRUE
-    }
-)
-
-setClass("Employees", contains="People", slots=c(job="character"))
-
-setValidity("Employees",
-    function(object)
-    {
-        if (!identical(length(object@name), length(object@job)))
-            return("'name' and 'job' slots must have the same length")
-        TRUE
-    }
-)
-
-setClass("Company", slots=c(company_name="character", employees="Employees"))
-
-setValidity("Company",
-    function(object)
-    {
-        if (length(object@company_name) != 1 || is.na(object@company_name))
-            return("'company_name' slot must be a single non-NA string")
-        TRUE
-    }
-)
-```
-
-
-# Classes, generics, and methods
-
-Class
-
-- Definition
-- Inheritance
-- Virtual classes
-
-Generic
-
-- Argument versus signature
-
-Method
-
-- Dispatch
-
-Formal characteristics
-
-- Strengths & weakneses
-- Column- versus row-oriented data
-
+[S4Vectors_canonical_url]: http://bioconductor.org/packages/S4Vectors
 
 
 # Essential _Bioconductor_ classes
@@ -180,11 +151,13 @@ Developers
 
 # Design and implementation of S4 objects
 
+
 ## 2 approaches
 
 - From scratch (a rare situation)
 
 - Extend an existing class (less work)
+
 
 ## What to implement
 
@@ -223,17 +196,15 @@ TODO (give examples)
 
 TODO (give examples)
 
-## On API design
 
-### Avoid surprising the user
+## Exercise
 
-TODO (give examples)
+TODO
 
-### Pay particular attention to how length, names, [, [[, c(), dim, dimnames behave
 
-WHY (give examples)
+## About objects shape
 
-### Most objects fall in one of these categories
+Most objects fall in one of these categories
 
 - vector-like: length()
 
@@ -266,13 +237,13 @@ These categories are not mutually exclusive:
   names(x) = colnames(x), x[[i]] = x[ , i]
   They are NOT matrix-like objects.
 
-### _Shape_ of an object
+These categories reflect the _shape_ of the object
 
-- linear: vector-like, list-like
+- linear shape: vector-like, list-like
 
-- rectangular: matrix-like, data-frame-like, SummarizedExperiment
+- rectangular shape: matrix-like, data-frame-like, SummarizedExperiment
 
-- multi-dimensional: array-like
+- multi-dimensional shape: array-like
 
 Rectangular and multi-dimensional objects have an "implicit linear
 shape". Think of it as the "backbone" of the object.
@@ -280,30 +251,29 @@ shape". Think of it as the "backbone" of the object.
 For example, 3 linear shapes can be associated with a rectangular shape.
 They are described by the following "backbones":
 
-    1) "matrix-like backbone":
+1) "matrix-like backbone":
 
-         run from the top-left element to the bottom-right element of the
-         rectangle, going thru the entire rectangle by running down along
-         all the columns (continuing from the top of next column when reaching
-         the bottom of a column)
+    run from the top-left element to the bottom-right element of the
+    rectangle, going thru the entire rectangle by running down along
+    all the columns (continuing from the top of next column when reaching
+    the bottom of a column)
 
-       This is the backbone of matrix-like objects.
-       Array-like objects generalize this to N dimensions: backbone runs
-       along the first dimension first (fastest changing dimension in R is
-       the first one), then along the 2nd dimension, and so on...)
+  This is the backbone of matrix-like objects.
+  Array-like objects generalize this to N dimensions: backbone runs
+  along the first dimension first (fastest changing dimension in R is
+  the first one), then along the 2nd dimension, and so on...)
 
-    2) "data-frame-like backbone":
+2) "data-frame-like backbone":
 
-         run *horizontally* from first to last column of the rectangle
+    run *horizontally* from first to last column of the rectangle
 
-       This is the backbone of data-frame-like objects.
+  This is the backbone of data-frame-like objects.
 
-    3) Bioconductor introduces a 3rd type of backbone for rectangular
-       objects:
+3) Bioconductor introduces a 3rd type of backbone for rectangular objects:
 
-         run *vertically* from first to last row of the rectangle
+    run *vertically* from first to last row of the rectangle
 
-       This is the "SummarizedExperiment-like backbone".
+  This is the "SummarizedExperiment-like backbone".
 
 When implementing a class that represents rectangular objects, the
 developper should decide what the backbone of the objects will be.
@@ -317,7 +287,13 @@ Making it clear what the backbone is in the documentation will help
 the user understand (and even predict) the behavior of length(x),
 names(x), x[i], c(), etc... No surprises!
 
-### Subsetting
+
+**Exercise**
+
+What's the shape of SNPLocations objects?
+
+
+## Subsetting
 
 R syntax allows 8 different forms of subsetting:
 
@@ -344,6 +320,21 @@ Some examples:
   Gotcha: [[ is also supported but behaves in a non-standard way!
 
 - GRanges objects support linear [ and [<- only
+
+**Exercise**
+
+Implement subsetting of SNPLocations objects.
+
+
+## About API design
+
+### Avoid surprising the user
+
+TODO (give examples)
+
+### Pay particular attention to how length, names, [, [[, c(), dim, dimnames behave
+
+WHY (give examples)
 
 ### To be or not to be an endomorphism
 
@@ -398,7 +389,7 @@ TODO
 - Can or be an endomorphism (ismorphism) or not
 
 
-## Reuse existing classes
+## Reusing existing classes
 
 - It's very likely that Bioconductor already has a container that handles
     the kind of data that your package needs to handle.
@@ -427,6 +418,11 @@ TODO
 - Ask on the bioc-devel mailing list if you are not sure.
 
 ### Concrete example: Extending the RangedSummarizedExperiment class.
+
+Open _A quick overview of the S4 class system_ (PDF) on the
+[S4Vectors landing page][S4Vectors_canonical_url] and go to the
+_Extending an existing class_ section.
+
 
 ## Extending a class without adding any slot
 
@@ -482,8 +478,9 @@ Let's look at downgrade:
 
 Works fine (both objects are valid IRanges objects)
 
-Note that there are other approaches to implementing constant-width IRanges
+Note that there are other approaches for implementing constant-width IRanges
 objects.
+
 
 ## Overriding existing methods
 
@@ -493,6 +490,7 @@ objects.
 - Examples: isEmpty() for ConstantWidthIRanges objects.
 
       TODO (try to find a better example)
+
 
 ## Extending vs composition
 
