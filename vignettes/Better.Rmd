@@ -71,7 +71,7 @@ Lessons learned / best practices
 
 # Olde school / neue school
 
-## Continuous Integration
+## Continuous integration
 
 - Commits trigger a script to build and check your package
 - Continuous integration on Linux and Windows platforms via (mostly)

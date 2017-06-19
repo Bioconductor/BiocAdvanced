@@ -1,19 +1,15 @@
 ---
-title: "S3 classes and methods"
+title: "_R_ data (vectors, classes) and programs (functions, methods)"
 author: "Martin Morgan, Hervé Pagès"
 date: "June 19 - 20, 2017"
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{R data (classes) and programs (functions and methods)}
   %\VignetteEngine{knitr::rmarkdown}
 output: 
   BiocStyle::html_document2
 ---
 
-
-
-# _R_ data (classes) and programs (functions and methods)
-
-## Building blocks
+# Building blocks
 
 ```{r}
 x <- rnorm(1000)
@@ -29,6 +25,12 @@ Atomic vectors
 
 Attributes
 
+```{r}
+x <- structure(list(), class="Foo")
+attributes(x)
+.Internal(inspect(x))
+```
+
 - Attributes in C
 
 An implicit class -- `matrix()`
@@ -42,7 +44,7 @@ Plain-old-functions
 
 - First class objects
 
-## S3
+# The S3 object system
 
 Class
 
@@ -87,17 +89,36 @@ Company <- function(company_name = character(), empolyees = Employees()) {
 
 Generic
 
-- 'Group' generics
+```{r}
+description <- function(object, ...)
+    UseMethod("description")
+```
 
 Method
 
+```{r}
+description.People <- function(object, ...)
+    paste0(object$name, "; age ", object$age)
+
+description.Employees <-
+    function(object, ...)
+{
+    person_description <- NextMethod()
+    paste(person_description, "; job", object$job)
+}
+```
+
 - 'Next' methods
+- 'Group' generic methods
 
-Formal characteristics
+Strengths & weakneses
 
-- Strengths & weakneses
+- (+) Easy to implement `structure(list(), class="Foo")`
+- (+, usually) Simple inheritance (linear) and dispatch (single)
+- (-) No guarantee of structure, or separation of 'implementation'
+  from 'interface'
 
-### Exercises
+# Exercises
 
 **Exercise:** `length()` S3 method
 
@@ -121,3 +142,46 @@ Revise `name()` and `age()` to be S3 generics and methods. Reflect on
 the beneifts and costs of plain-old-functions versus generic +
 methods.
 
+**Exercise:** (Return here after S4 presentation)
+
+Re-implement the `People`, `Employees`, and `Company` S3 example in
+S4. Compare and contrast. S4 is often viewed as verbose; is the S4
+implementation longer or more complicated than the S3 implementation?
+
+<!--
+```{r}
+People <- setClass(
+    "People",
+    slots = c(name = "character", age = "numeric")
+)
+
+setValidity("People", function(object) {
+    if (!identical(length(name(object)), length(age(object)))) {
+        "lengths of name() and age() differ"
+    } else TRUE
+})
+
+Employees <- setClass(
+    "Employees", 
+    contains = "People",
+    slots = c(job = "character")
+)
+
+setValidity("Employees", function(object) {
+    if (!identical(length(employees(object)), length(jobs(object)))) {
+        "length of employee() and job() differ"
+    } else TRUE
+})
+
+Company <- setClass(
+    "Company",
+    slots = c(company_name = "character", employee = "Employees")
+)
+
+setValidity("Company", function(object) {
+    if (length(company_name) != 1 || !is.na(company_name)) {
+        "company_name must be length 1 and not NA"
+    } else TRUE
+})
+```
+-->

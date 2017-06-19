@@ -11,7 +11,7 @@ output:
 
 # _R_ as we know it
 
-## Memory management
+## Memory management: copy-on-change; garbage collection
 
 Copy on change
 
@@ -223,7 +223,7 @@ Robust
 
     ```{r}
     tests <- function(f) {
-        test_that("f() is correct", {
+        test_that("f() is correct and robust", {
             expect_identical(f(5), 1:5)
             expect_identical(f(1), 1L)
             expect_identical(f(0), integer(0))
@@ -1132,11 +1132,70 @@ Do this in several stages, from 'easy' to harder
 
 ## Rcpp
 
+1. Create a new package using `Rcpp::Rcpp.package.skeleton()`. Edit
+   the DESCRIPTION file to include `BH` in the `LinkingTo:` field.
+
+2. Add a file `src/rcpp_uuid.cpp` with the boost-related code
+
+    ```
+    #include <boost/uuid/uuid_generators.hpp>
+    #include <boost/uuid/uuid_io.hpp>
+    
+    static boost::uuids::random_generator uuid_generator =
+        boost::uuids::random_generator();
+    
+    std::string uuid_generate()
+    {
+        return boost::uuids::to_string(uuid_generator());
+    }
+    ```
+    
+3. Include the `Rcpp.h` header and use the Rcpp namespace
+
+    ```
+    #include <Rcpp.h>
+    using namespace Rcpp;
+    ```
+
+4. Implement the function using Rcpp structures like
+   `CharacterVector`; no need to worry about coercing the argument,
+   PROTECTion, etc. Decorate the function with the 
+   `// [[Rcpp::export]]` attribute.
+   
+    ```
+    // [[Rcpp::export]]
+    CharacterVector rcpp_uuid(int n) {
+        CharacterVector uuids(n);
+        for (int i = 0; i < uuids.size(); ++i)
+            uuids[i] = uuid_generate();
+        return uuids;
+    }
+    ```
+
+5. In _R_, make Rcpp process the attributes; check out
+   `src/RcppExports.cpp` and `R/RcppExports.R`
+   
+   ```
+   > Rcpp::compileAttributes()
+   ```
+
+6. Install and use!
+
+    ```
+    Rcppuuid$ R CMD INSTALL .
+    [...]
+    Rcppuuid$ R --vanilla -e "Rcppuuid::rcpp_uuid(3)"
+    > Rcppuuid::rcpp_uuid(3)
+    [1] "cb9cc7e8-bfcb-4262-b05b-2f1c0a4bc196"
+    [2] "7b592e1f-8341-4da0-af04-b387726af8ea"
+    [3] "7b2ade09-6ff2-4e76-b564-31b1a626e864"
+    ```
+    
 ## Fun (?!) with C-level debugging
 
 Setup
 
-- `gdb` on linux, `lldb` on Mac
+- `gdb` on linux, `lldb` on Mac; [gdb-to-lldb][gdb-lldb] command map.
 - Code compiled _with_ debugging symbols and _without_ optimizations
 - One approach:
 
