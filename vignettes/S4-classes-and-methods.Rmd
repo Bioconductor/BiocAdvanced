@@ -133,20 +133,54 @@ _Implementing an S4 class (in 4 slides)_ section.
 
 [S4Vectors_canonical_url]: http://bioconductor.org/packages/S4Vectors
 
+**Exercise**
 
-# Essential _Bioconductor_ classes
+- Implement the SNPLocations class (`setClass()` statement, validity method, and `"length"` method only). Allow the genome slot to contain an NA
 
-## Motivation / necessity
+```{r}
+setClass("SNPLocations",
+    slots=c(
+        genome="character",  # a single string or NA
+        snpid="character",   # a character vector of length N
+        chrom="character",   # a character vector of length N
+        pos="integer"        # an integer vector of length N
+    )
+)
 
-Users
+setValidity("SNPLocations",
+    function(object)
+    {
+        if (length(object@genome) != 1)
+            return("'genome' slot must have length 1")
+        slot_lengths <- c(length(object@snpid),
+                          length(object@chrom),
+                          length(object@pos))
+        if (length(unique(slot_lengths)) != 1)
+            return("'snpid', 'chrom' and 'pos' slots must have the same length")
+        TRUE
+    }
+)
 
-Developers
+setMethod("length", "SNPLocations", function(x) length(x@snpid))
 
-## Key classes for end users
+```
 
-- GenomicRanges
-- SummariedExperiment
+- Call `new("SNPLocations")`. What happens? Does this look right?
 
+- How could we change the behavior of `new("SNPLocations")` so it generates
+  a valid object?
+
+```{r}
+setClass("SNPLocations",
+    slots=c(
+        genome="character",
+        snpid="character",
+        chrom="character",
+        pos="integer"
+    ),
+    prototype=list(genome=NA_character_)
+)
+```
 
 
 # Design and implementation of S4 objects
@@ -159,50 +193,56 @@ Developers
 - Extend an existing class (less work)
 
 
-## What to implement
+## What to implement?
 
 ### Core stuff
 
-- class def
+- Class def (`setClass` statement)
 
-- validity
+- Validity method
 
-- constructor
+- Constructor function (named as the class, should be documented and user
+  friendly).
 
-- show method
+- `"show"` method
 
 ### API
 
 **At a minimum some getters** Try to reuse existing generics instead of
 introducing new ones e.g.:
 
-- organism, score (defined in BiocGenerics), strand
+- `organism()`, `score()`, `strand()` (defined in BiocGenerics)
 
-- seqinfo (defined in GenomeInfoDb)
+- `genome()`, `seqinfo()` (defined in GenomeInfoDb)
 
 **Depending on the _shape_ of the objects, methods for some of the following core generic functions** (from base R):
 
-    length, names, subsetting ([, [[), dim, dimnames, c(),
-    setters, names<-, subassignment ([<-, [[<-), dimnames<-
+- `length()`, `names()`, subsetting (`[`, `[[`), `dim()`, `dimnames()`, `c()`
+
+**Some setters** (unless the objects are not intended to be modified)
+
+- Setters for the corresponding getters
+
+- Methods for some of `names<-`, subassignment (`[<-`, `[[<-`), `dimnames<-`
 
 **Specialized operations** As methods for existing generics (e.g. `normalize`
 defined in BiocGenerics), or as new generics.
 
 ### Coercion methods
 
-TODO (give examples)
+```{r}
+setAs("SNPLocations", "data.frame",
+    function(from)
+        data.frame(snpid=from@snpid, chrom=from@chrom, pos=from@pos)
+)
+```
 
-### Subtle difference between being an "A instance" and an "A object"
+**Exercise**
 
-TODO (give examples)
-
-
-## Exercise
-
-TODO
+Implement a coercion method from SNPLocations to GRanges.
 
 
-## About objects shape
+## About the shape of an object
 
 Most objects fall in one of these categories
 
@@ -328,29 +368,21 @@ Implement subsetting of SNPLocations objects.
 
 ## About API design
 
-### Avoid surprising the user
+- Avoid surprising the user
 
-TODO (give examples)
+- Pay particular attention to how `length()`, `names()`, `[`, `[[`, c(), `dim()`, `dimnames()` behave
 
-### Pay particular attention to how length, names, [, [[, c(), dim, dimnames behave
+### To be or not to be an endomorphism?
 
-WHY (give examples)
+Examples:
 
-### To be or not to be an endomorphism
+- `[` (drop=FALSE) (except linear subsetting on an array-like object)
 
-#### Definition
-
-TODO
-
-#### Examples
-
-- [ (drop=FALSE) (except linear subsetting on an array-like object)
-
-- Replacement methods (including [<- and [[<-).
-  Examples: names(), mcols(), seqinfo() setters on any object for which
-  they are defined.
+- Replacement methods: `[<-` and `[[<-` and other setters (e.g. `names<-`,
+  `mcols<-`, `seqinfo<`, etc...)
  
   But with some notable exceptions:
+
   - [<- on an atomic vector when the storage.mode of the vector cannot
     represent the right-value (e.g. x[2] <- 3.4 on an integer vector,
     or x[2] <- "a" on a numeric vector)
@@ -360,23 +392,19 @@ TODO
 - c() on linear objects (e.g. on Hits, GRanges, GRangesList,
         DNAStringSet objects)
 
-- c() on rectangular objects with data-frame-like backbones
-        (equivalent to cbind())
-
-- c() on rectangular objects with SummarizedExperiment-like backbones
-        (equivalent to rbind())
-
 - Intra-range transformations (e.g. shift(), flank(), etc...)
 
-#### NOT endomorphisms
+NOT endomorphisms:
 
 - c() on array-like objects
 
-- Inter-range transformations (e.g. reduce(), disjoin()) in general are
+- Inter-range transformations (e.g. `reduce()`, `disjoin()`) in general are
   not endomorphisms:
 
+```{r}
     gpos <- GPos(c("chr1:4-20", "chr1:50-60"))
     reduce(gpos)
+```
 
 ### Transformation that preserve positionality
 
@@ -417,11 +445,11 @@ TODO
 
 - Ask on the bioc-devel mailing list if you are not sure.
 
-### Concrete example: Extending the RangedSummarizedExperiment class.
+**Exercise**
 
-Open _A quick overview of the S4 class system_ (PDF) on the
-[S4Vectors landing page][S4Vectors_canonical_url] and go to the
-_Extending an existing class_ section.
+- Modify the definition of the SNPLocations class to make it extend Vector.
+
+- What to we gain by doing this?
 
 
 ## Extending a class without adding any slot
