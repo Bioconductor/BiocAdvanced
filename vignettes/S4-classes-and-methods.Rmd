@@ -513,7 +513,7 @@ Examples:
 - `[` (when `drop=FALSE`), except linear subsetting on an array-like object
 
 - Replacement methods: `[<-` and `[[<-` and other setters (e.g. `names<-`,
-  `mcols<-`, `seqinfo<`, ...) With some notable exceptions:
+  `mcols<-`, `seqinfo<-`, ...) With some notable exceptions:
 
     - `[<-` on an atomic vector when the storage.mode of the vector cannot
       represent the right-value (e.g. `x[2] <- 3.75` on an integer vector,

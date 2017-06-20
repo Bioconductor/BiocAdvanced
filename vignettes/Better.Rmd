@@ -78,7 +78,7 @@ Lessons learned / best practices
 
 ```{r, message=FALSE}
 library(BiocFileCache)
-library(TENxGenomics)
+library(TENxGenomics)              # https://github.com/mtmorgan/TENxGenomics
 fl <- bfcrpath(BiocFileCache(), "1M_neurons_filtered_gene_bc_matrices_h5.h5")
 
 TENxGenomics(fl)                          # big!
