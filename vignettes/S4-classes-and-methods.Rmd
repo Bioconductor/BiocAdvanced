@@ -134,13 +134,13 @@ Open _A quick overview of the S4 class system_ (PDF) on the
 [S4Vectors landing page][S4Vectors_canonical_url] and go to the
 _Implementing an S4 class (in 4 slides)_ section.
 
-[S4Vectors_canonical_url]: http://bioconductor.org/packages/S4Vectors
+[S4Vectors_canonical_url]: https://bioconductor.org/packages/S4Vectors
 
 **Exercise**
 
 - Implement the SNPLocations class (`setClass()` statement, validity method, and `"length"` method only). Allow the genome slot to contain an NA
 
-```{r}
+```{r, results="hide"}
 setClass("SNPLocations",
     slots=c(
         genome="character",  # a single string or NA
@@ -183,6 +183,7 @@ setClass("SNPLocations",
     prototype=list(genome=NA_character_)
 )
 ```
+
 
 
 # Design and implementation of S4 objects
@@ -448,14 +449,16 @@ Examples:
 - `seqnames()`, `start()`, `end()`, `width()`, `strand()` getters on a
   GRanges or GRangesList object.
 
-- _**Intra**-range transformations_ in Bioconductor (e.g. `shift()`,
-  `flank()`, ...)
+- _**Intra**-range transformations_ in Bioconductor e.g. `shift()`,
+  `flank()`, ...
 
 ```{r}
 gr <- GRanges(c("chr1:51-70", "chr1:75-100", "chr1:6-55"))
 gr
 shift(gr, 1000)
 ```
+
+- `Biostrings::translate()` on a DNAStringSet object (not on a DNAString).
 
 These operations typically _propagate_ the names.
 
@@ -527,6 +530,8 @@ gpos
 reduce(gpos)
 ```
 
+- `Biostrings::translate()`
+
 
 ## Reusing existing classes
 
@@ -563,6 +568,12 @@ finding the right container for your data (to use as-is or to extend).
 
 [bioc_devel_url]: https://bioconductor.org/help/support/#bioc-devel
 
+The _SummarizedExperiment_ vignette (available
+[here][SummarizedExperiment_canonical_url]) has a section dedicated
+to how to extend the RangedSummarizedExperiment class.
+
+[SummarizedExperiment_canonical_url]: https://bioconductor.org/packages/SummarizedExperiment
+
 Starting a new class from scratch should be the last resort.
 Even in that case, it's very likely that you could extend one of the
 virtual classes that are at the bottom of our core class hierarchy.
@@ -598,33 +609,37 @@ For example:
 
 ## Extending a class without adding any slot
 
-Typically to add constraints on the object.
+Sometimes we need to extend a class not to add slots to it, but to add
+constraints on the objects.
 
-### Example: I want to implement a class that represent IRanges objects of constant width
+For example NormalIRanges objects have the same slots as IRanges objects
+but NormalIRanges objects have the obligation to be _normal_ (see Normality
+section in `?isNormal` for what that means).
 
-One option is to extend IRanges:
+A simpler example is the following: let's say we want to implement a class
+that represent IRanges objects of constant width. A simple option is to
+just extend the IRanges class:
 
-  setClass("ConstantWidthIRanges", contains="IRanges")
+```{r}
+setClass("ConstantWidthIRanges", contains="IRanges")
+```
 
-and to add the "constant width" constraint thru a validity method:
+and add the "constant width" constraint via a validity method:
 
-  setValidity("ConstantWidthIRanges",
-      function(object)
-      {
-          w <- width(object)
-          if (length(w) != 0L && any(w != w[[1]]))
-              return("object width is not constant")
-          TRUE
-      }
-  )
+```{r, results="hide"}
+setValidity("ConstantWidthIRanges",
+    function(object)
+    {
+        w <- width(object)
+        if (length(w) != 0L && any(w != w[[1]]))
+            return("object width is not constant")
+        TRUE
+    }
+)
+```
 
-Open a parenthesis here to discuss
-
-      length(w) != 0L && any(w != w[[1]]
-
-vs
-
-      length(unique(w)) > 1
+(Should we discuss `length(w) != 0L && any(w != w[[1]]` vs
+`length(unique(w)) > 1`?)
 
 The S4 system provides automatic coercion methods from parent to child
 (promotion) and from child to parent (downgrade).
@@ -633,22 +648,32 @@ There is a gotcha with these methods though.
 
 Let's look at promotion:
 
-  x <- as(IRanges(6:8, width=10), "ConstantWidthIRanges")
-  validObject(x)
-  y <- as(IRanges(6:8, end=10), "ConstantWidthIRanges")
+```{r}
+x <- as(IRanges(6:8, width=10), "ConstantWidthIRanges")
+y <- as(IRanges(6:8, end=10), "ConstantWidthIRanges")
+```
 
-mmmh... it worked, but it produced an invalid object:
+Surprisingly the coercion worked for `y` but produced an invalid
+ConstantWidthIRanges object:
 
-  validObject(x)
+```{r, eval=FALSE}
+validObject(x)  # TRUE
+validObject(y)  # error!
+```
 
 Why?
 
 Let's look at downgrade:
 
-  x2 <- as(x, "IRanges")
-  y2 <- as(y, "IRanges")
+```{r}
+x2 <- as(x, "IRanges")
+y2 <- as(y, "IRanges")
+```
 
-Works fine (both objects are valid IRanges objects)
+Works fine (both objects are valid IRanges instances).
+
+So coercion from IRanges to ConstantWidthIRanges is broken. How can we
+fix it?
 
 Note that there are other approaches for implementing constant-width IRanges
 objects.
@@ -656,12 +681,25 @@ objects.
 
 ## Overriding existing methods
 
-- Override only if you see an oportunity for a more efficient implementation,
-  NEVER to change the semantics.
+When we extend a class, we get a lot of things that work out-of-the-box
+(thanks to inheritance).
 
-- Examples: isEmpty() for ConstantWidthIRanges objects.
+A few things don't work exactly as expected though, so we need to fix them.
+The **standard mechanism** for doing this is by **overriding existing
+methods**.
 
-      TODO (try to find a better example)
+3 important things to keep in mind when overriding methods:
+
+1. We only need to do this for methods that don't behave as expected.
+
+2. We should NEVER override a method to change its semantic! For example
+   implementing a `"width"` method for ConstantWidthIRanges objects that
+   return the width as a single number would be a very bad idea.
+   Why? What should we do if we want something like that?
+
+3. Last but not least: sometimes we do it to improve performance!
+
+Example: `"sum"` method for CompressedIntegerList objects.
 
 
 ## Extending vs composition
@@ -693,49 +731,49 @@ Consider the 2 following implementations:
         )
     )
 
-One extends the IRanges class so inerits the IRanges slots and full IRanges
-API. is(x, "IRanges") will be true on these objects. This says: an
-ArrayViewport1 object *is* an IRanges object so can be used anywhere an
-IRanges object is expected.
+One extends the IRanges class so inherits the IRanges slots and full IRanges
+API. `is(x, "IRanges")` will be TRUE on these objects. This says: "an
+ArrayViewport1 object **is** an IRanges object so can be used anywhere an
+IRanges object is expected".
 
-The other one uses composition. An ArrayViewport2 object *is not* an IRanges
-object but it *has* one (in its 'ranges' slot).
+The other one uses composition. Unlike ArrayViewport1 objects, ArrayViewport2
+objects *are not* considered to be IRanges object. But they *have* one
+inside them (stored in the `'ranges'` slot).
 
-In the end, the 2 containers store the same data but their semantics are
-very different. Which one to choose?
+In the end, the 2 containers store the same data but their _semantics_ are
+different. Which one to choose?
 
-It all depends!  MORE ON THIS...
-
-I want my viewport objects to have the shape of an array i.e. dim() should
-return the dimensions of the sub-array delimitted by the viewport.
-
-## Documenting the class
-
-TODO
-
-## ArrayGrid objects dissected
-
-TODO
+Now I want my viewport objects to have the shape of an array i.e. `dim()`
+should return the dimensions of the sub-array delimitted by the viewport.
+Can I make the right choice now?
 
 
-# A close look at some core Bioconductor classes
+## Documenting an S4 class
 
-## GRangesList
+- Talk about accessors, not about slots.
 
-TODO
+- Focus on semantics, not on implementation details.
 
-## RangedSummarizedExperiment
+- If your class extends a class that is already well documented, refer the
+  reader to the man page of that class and add a link to it (typically in
+  the `\seealso` section). Don't repeat this information in your man page.
 
-TODO
+- Add `\alias{MyClass}` (in addition to `\alias{class:MyClass}` and
+  `\alias{MyClass-class}`) to make it easier for the end-user to find
+  your man page.
+
+See `?GPos` in the `GenomicRanges` package for an example.
 
 
-# Efficiency
 
-TODO
+# ArrayGrid objects dissected
 
-## Common 'tricks'
+```{r}
+library(DelayedArray)
+grid <- ArrayRegularGrid(c(10L, 10L), spacings=c(5L, 4L))
+grid
+```
 
-TODO
 
 
 # Resources
@@ -746,13 +784,14 @@ TODO
 
 - Note: S4 is NOT covered in the _An Introduction to R_ or
   _The R language definition_ manuals (both available on CRAN
-  [here][manuals_url])
+  [here][manuals_url]).
 
-[manuals_url]: http://cran.r-project.org/manuals.html
+[manuals_url]: https://cran.r-project.org/manuals.html
 
 - The _Writing R Extensions_ manual for some details about integrating
-  S4 classes to a package
+  S4 classes to a package.
 
 - The _Extending RangedSummarizedExperiment_ section of the
-  _SummarizedExperiment_ vignette in the `SummarizedExperiment` package
+  _SummarizedExperiment_ vignette. Available on the [`SummarizedExperiment`
+  package landing page][SummarizedExperiment_canonical_url].
 
