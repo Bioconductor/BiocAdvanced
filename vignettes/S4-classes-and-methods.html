@@ -595,8 +595,8 @@ y2 &lt;- as(y, &quot;IRanges&quot;)</code></pre>
 <p>Let’s say we want to implement a class for representing a view on an array i.e. a multi-dimensional window on an array. The window can be represented by a set of ranges, one range per dimension e.g. [1-4, 1-5] for the topleft corner of a matrix. For an array with N dimensions, we need N ranges to represent the view. We’ll call this kind of object a “viewport” (by analogy with the terminology used in the computer graphics world).</p>
 <p>In our viewport objects, we also want to store the dimensions of “the reference array” i.e. the array on top of which the viewport is defined (a.k.a. “the underlying array”). This will be useful for validation purposes.</p>
 <p>Consider the 2 following implementations:</p>
-<pre><code>setClass(&quot;ArrayViewport1&quot;,
-    contains=&quot;IRanges&quot;
+<pre class="r"><code>setClass(&quot;ArrayViewport1&quot;,
+    contains=&quot;IRanges&quot;,
     representation(
         refdim=&quot;integer&quot;
     )
@@ -604,7 +604,7 @@ y2 &lt;- as(y, &quot;IRanges&quot;)</code></pre>
 
 setClass(&quot;ArrayViewport2&quot;,
     representation(
-        refdim=&quot;integer&quot;
+        refdim=&quot;integer&quot;,
         ranges=&quot;IRanges&quot;
     )
 )</code></pre>

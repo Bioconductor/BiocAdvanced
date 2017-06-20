@@ -717,19 +717,21 @@ reference array" i.e. the array on top of which the viewport is defined
 
 Consider the 2 following implementations:
 
-    setClass("ArrayViewport1",
-        contains="IRanges"
-        representation(
-            refdim="integer"
-        )
+```{r}
+setClass("ArrayViewport1",
+    contains="IRanges",
+    representation(
+        refdim="integer"
     )
+)
 
-    setClass("ArrayViewport2",
-        representation(
-            refdim="integer"
-            ranges="IRanges"
-        )
+setClass("ArrayViewport2",
+    representation(
+        refdim="integer",
+        ranges="IRanges"
     )
+)
+```
 
 One extends the IRanges class so inherits the IRanges slots and full IRanges
 API. `is(x, "IRanges")` will be TRUE on these objects. This says: "an
