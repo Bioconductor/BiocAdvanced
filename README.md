@@ -23,11 +23,11 @@ Part 1: [Inside the mind of _R_][] (Day 1)
 - _R_ as we know it -- why it behaves the way it does
 - Inner _R_: understanding the _C_ API and implementation
 
-Part 2: [S3 classes and methods][] (Day 1)
+Part 2: [S3 classes and methods][] (Day 2)
 
 - _R_ data and programs (vectors, classes, functions and methods) -- the S3 way
 
-Part 3: [S4 classes and methods][] (Day 1 & 2)
+Part 3: [S4 classes and methods][] (Day 2)
 
 - _R_ data and programs (classes, functions and methods) -- the S4 way
 - Essential _Bioconductor_ classes: implementation and extension
