@@ -33,17 +33,18 @@ a small subset of the system.
 
 ## Strengths of S4 (compared to S3)
 
-**Multiple dispatch**
+### Multiple dispatch
 
-**Object validation**
+### Object validation
 
-**API vs internals** Unlike other OO programming languages, S4 offers no
-provision for encapsulation: the _internals_ of an object (i.e. all its slots)
-are visible and directly accessible. However, the Bioconductor approach is
-to consider that the _internals_ are the business of the developer and
-that the end user should never need to access them directly or even look
-at them. Access should be only via _accessor functions_ (_getters_ or
-_setters_).
+### API vs internals
+
+Unlike other OO programming languages, S4 offers no provision for
+encapsulation: the _internals_ of an object (i.e. all its slots) are visible
+and directly accessible. However, the Bioconductor approach is to consider
+that the _internals_ are the business of the developer and that the end user
+should never need to access them directly or even look at them.
+Access should be only via _accessor functions_ (_getters_ or _setters_).
 
 This has the following advantages:
 
@@ -65,15 +66,16 @@ should do it in a way that is agnostic about the internals of the class
 they extend. S4 makes this possible (it's a great feature). More on this
 later.
 
-**Powerful coercion system**
+### Powerful coercion system
 
+### Virtual/concrete classes
 
-**Virtual/concrete classes** A _virtual_ class is a class that cannot be
-_instanciated_. Typically used as the parent of one or more concrete classes:
+A _virtual_ class is a class that cannot be _instanciated_. Typically used
+as the parent of one or more concrete classes:
 
     setClass("A", representation("VIRTUAL"))  # virtual class
-    setClass("A1", contains="A", slots=some slots)
-    setClass("A2", contains="A", slots=some other slots)
+    setClass("A1", contains="A", slots=...some slots...)
+    setClass("A2", contains="A", slots=...some other slots...)
 
 For example the GRanges and GPos classes are both subclasses of virtual class
 GenomicRanges:
@@ -98,14 +100,18 @@ So instead of defining 2 `"names"` methods (one for GRanges and one for GPos
 objects) we define one method for GenomicRanges objects. GRanges and GPos
 objects inherit it.
 
-**Virtual classes with no slots** A virtual class can have slots (like
-GenomicRanges), or no slots (like class A in our first example).
+### Virtual classes with no slots
+
+A virtual class can have slots (like GenomicRanges), or no slots (like class
+A in our first example).
 Typically the slots of a virtual class are not enough to represent
 an object (this is why the class is made virtual). The concrete subclasses
 add the missing slots.
 
-**Multiple inheritance** Powerful but can lead to a class hierarchy that is
-very hard to maintain if not used carefully.
+### Multiple inheritance
+
+Powerful but can lead to a class hierarchy that is very hard to maintain
+if not used carefully.
 
 ```{r}
 showClass("CompressedIRangesList")
@@ -114,7 +120,9 @@ showClass("CompressedIRangesList")
 S4 imposes no restrictions but I think we never had the need to define
 a class with more than 2 direct parents.
 
-**Class unions** Just a special kind of virtual class with no slots.
+### Class unions
+
+Just a special kind of virtual class with no slots.
 
 ```{r}
 showClass("GenomicRanges_OR_GRangesList")
@@ -122,10 +130,12 @@ showClass("GenomicRanges_OR_GRangesList")
 
 (This class is used in the definition of RangedSummarizedExperiment objects.)
 
-**Reference classes** Rarely needed. As a general principle, R objects
-should have a pass-by-copy semantic so passing them to a function is
-guaranteed to leave the original object unmodified. Pass-by-reference
-semantic is almost never needed and should be avoided.
+### Reference classes
+
+Rarely needed. As a general principle, R objects should have a _pass-by-copy
+semantic_ so passing them to a function is guaranteed to leave the original
+object unmodified. _Pass-by-reference semantic_ is almost never needed and
+should be avoided.
 
 
 ## A first example
@@ -249,26 +259,26 @@ Implement a coercion method from SNPLocations to GRanges.
 
 Most objects fall in one of these categories
 
-- vector-like: length()
+- **vector-like** objects: `length()`
 
   Examples: atomic vectors and ordinary list in base R; Rle, Hits, IRanges,
   GRanges, GRangesList, DNAString, DNAStringSet objects
 
-- list-like: vector-like + [[
+- **list-like** objects: `vector-like` + `[[`
 
-  Examples: ordinary list and data frames in base R
-                  CharacterList, IRanges, IRangesList, GRangesList,
-                  DNAStringSet
+  Examples: ordinary list and data frames in base R.
+  CharacterList, IRanges, IRangesList, GRangesList, DNAStringSet in
+  Bioconductor.
 
-- matrix-like, array-like objects: dim() and length(x) = prod(dim(x))
+- **matrix-like**, **array-like** objects: `dim()` and
+  `length(x)` (= `prod(dim(x))`)
 
-  Examples: matrix and array objects in base R, Matrix objects in the
-            `Matrix` package, DelayedArray objects in the `DelayedArray`
-            package
+  Examples: matrix and array objects in base R. Matrix objects in the
+  `Matrix` package. DelayedArray objects in the `DelayedArray` package.
 
-- data-frame-like: dim() + list-like along the columns
+- **data-frame-like** objects: `dim()` + list-like **along the columns**
 
-  Examples: data.frame objects in base R, DataFrame
+  Examples: data.frame objects in base R. DataFrame objects in Bioconductor.
 
 These categories are not mutually exclusive:
 
@@ -276,23 +286,23 @@ These categories are not mutually exclusive:
 
 - array-like objects are also vector-like objects
 
-- data-frame-like are list-like objects: length(x) = ncol(x)),
-  names(x) = colnames(x), x[[i]] = x[ , i]
+- data-frame-like objects are list-like objects: `length(x)` is `ncol(x))`,
+  `names(x)` is `colnames(x)`, `x[[i]]` is `x[ , i]`
   They are NOT matrix-like objects.
 
 These categories reflect the _shape_ of the object
 
-- linear shape: vector-like, list-like
+- **linear** shape: vector-like, list-like
 
-- rectangular shape: matrix-like, data-frame-like, SummarizedExperiment
+- **rectangular** shape: matrix-like, data-frame-like, SummarizedExperiment
 
-- multi-dimensional shape: array-like
+- **multi-dimensional** shape: array-like
 
 Rectangular and multi-dimensional objects have an "implicit linear
 shape". Think of it as the "backbone" of the object.
 
-For example, 3 linear shapes can be associated with a rectangular shape.
-They are described by the following "backbones":
+For example, 3 different linear shapes can be associated with a rectangular
+shape. They are described by the following "backbones":
 
 1) "matrix-like backbone":
 
@@ -320,15 +330,15 @@ They are described by the following "backbones":
 
 When implementing a class that represents rectangular objects, the
 developper should decide what the backbone of the objects will be.
-Concretely that means deciding what the "length" method will return:
-prod(dim(x)), ncol(x), or nrow(x)?
-Once this choice is made, things like names(x), x[i], and c() should
-behave consistently (e.g. c(x, y) should concatenate the 2 objects
+Concretely that means deciding what the `"length"` method will return:
+`prod(dim(x))`, `ncol(x)`, or `nrow(x)`?
+Once this choice is made, things like `names(x)`, `x[i]`, and `c()` should
+behave consistently (e.g. `c(x, y)` should concatenate the 2 objects
 along their backbones).
 
 Making it clear what the backbone is in the documentation will help
-the user understand (and even predict) the behavior of length(x),
-names(x), x[i], c(), etc... No surprises!
+the user understand (and predict) the behavior of `length(x)`,
+`names(x)`, `x[i]`, `c()`, etc...
 
 
 **Exercise**
