@@ -16,7 +16,7 @@ Description: This package contains training material for advanced R
 Depends: R (>= 3.4.0)
 Suggests: GenomicRanges, DelayedArray, BiocFileCache, TENxGenomics, airway,
     plotly, BiocStyle, knitr, rmarkdown, testthat, microbenchmark, devtools,
-    roxygen2, tidyverse
+    tidyverse, reshape2
 VignetteBuilder: knitr
 License: Artistic-2.0
 Encoding: UTF-8
