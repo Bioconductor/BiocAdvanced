@@ -141,7 +141,8 @@ for (i in 1:n)
     x <- c(x, i)
 ```
 
-<!--
+Answer:
+
 ```{r, eval = FALSE}
 n = 5
 x = integer(); .Internal(inspect(x))
@@ -157,7 +158,6 @@ for (i in 1:n) {
 }
 x
 ```
--->
 
 - If an integer occupies about 8 bytes of memory, and each iteration
   in the loop copies the current allocation into the new allocation,
@@ -319,6 +319,8 @@ Fast
     n <- 1000
     microbenchmark(f1(n), f2a(n), f3(n), f4(n), f5(n))
     ```
+
+[microbenchmark]: https://cran.r-project.org/package=microbenchmark
 
 ## Symbol resolution and evaluation
 
@@ -526,30 +528,30 @@ Evaluation, lazy and non-standard evaluation
     }
     ```
 
-<!--
-    ```{r}
-    account <- function() {
-       balance <- 0
+Answer: 
 
-       available <- function() {
-           balance
-       }
+```{r}
+account <- function() {
+   balance <- 0
 
-       deposit <- function(amt) {
-           balance <<- balance + amt
-           balance
-       }
+   available <- function() {
+       balance
+   }
 
-       withdraw <- function(amt) {
-           if (amt > balance)
-               stop("insufficient funds")
-           deposit(-amt)
-       }
+   deposit <- function(amt) {
+       balance <<- balance + amt
+       balance
+   }
 
-       list(available = available, deposit = deposit, withdraw = withdraw)
-    }
-    ```
--->
+   withdraw <- function(amt) {
+       if (amt > balance)
+           stop("insufficient funds")
+       deposit(-amt)
+   }
+
+   list(available = available, deposit = deposit, withdraw = withdraw)
+}
+```
 
 - Implement for the following test case, using the concept of lexical scope:
 
@@ -576,34 +578,34 @@ Evaluation, lazy and non-standard evaluation
     })
     ```
 
-<!--
-    ```{r}
-    account <- function() {
-       balance <- 0
+Answer:
 
-       available <- function() {
-           balance
-       }
+```{r}
+account <- function() {
+   balance <- 0
 
-       deposit <- function(amt) {
-           balance <<- balance + amt
-           funs
-       }
+   available <- function() {
+       balance
+   }
 
-       withdraw <- function(amt) {
-           if (amt > balance)
-               stop("insufficient funds")
-           deposit(-amt)
-       }
-
-       funs = list(
-           available = available, deposit = deposit, withdraw = withdraw
-       )
-
+   deposit <- function(amt) {
+       balance <<- balance + amt
        funs
-    }
-    ```
--->
+   }
+
+   withdraw <- function(amt) {
+       if (amt > balance)
+           stop("insufficient funds")
+       deposit(-amt)
+   }
+
+   funs = list(
+       available = available, deposit = deposit, withdraw = withdraw
+   )
+
+   funs
+}
+```
 
 **Exercise:** bank account 2
 
@@ -640,25 +642,25 @@ Evaluation, lazy and non-standard evaluation
     ## setTolerance = ...
     ```
 
-<!--
-    ```{r}
-    .myoptions <- local({
-        tolerance = 1e-4
-        get = function() tolerance
-        list(
-            get = get,
-            set = function(value) {
-                ovalue <- get()
-                tolerance <<- value
-                ovalue
-            }
-        )
-    })
+Answer:
 
-    getTolerance <- .myoptions$get
-    setTolerance <- .myoptions$set
-    ```
--->
+```{r}
+.myoptions <- local({
+    tolerance = 1e-4
+    get = function() tolerance
+    list(
+        get = get,
+        set = function(value) {
+            ovalue <- get()
+            tolerance <<- value
+            ovalue
+        }
+    )
+})
+
+getTolerance <- .myoptions$get
+setTolerance <- .myoptions$set
+```
 
 - Here are some unit tests
 
@@ -1047,11 +1049,9 @@ When to worry?
     devtools::install("/tmp/uuid")
     ```
 
-<!--
-```{r}
+```{r, echo=FALSE}
 unlink("/tmp/uuid", recursive = TRUE)
 ```
--->
 
 ### Exercises
 

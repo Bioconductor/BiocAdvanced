@@ -3,10 +3,10 @@ title: "S4 classes and methods"
 author: "Martin Morgan, Hervé Pagès"
 date: "June 19 - 20, 2017"
 vignette: >
-  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteIndexEntry{S4 classes and methods}
   %\VignetteEngine{knitr::rmarkdown}
 output: 
-  BiocStyle::html_document
+  BiocStyle::html_document2
 ---
 
 
