@@ -2,7 +2,7 @@
 
 Instructor: Martin Morgan<br />
 Date: July 31-August 1, 2018<br />
-Location: Cuernavaca, Mexico<br />
+Location: TiB 2018, Cuernavaca, Mexico<br />
 
 1. [Keynote][1] (1 hour)
 2. [Writing efficient R functions][2] (1 hour)
