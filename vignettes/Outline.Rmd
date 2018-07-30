@@ -1,0 +1,23 @@
+---
+title: "Outline"
+author: "Martin Morgan"
+date: "July 31 - August 1, 2018"
+vignette: >
+  %\VignetteIndexEntry{Outline}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document
+---
+
+1. [Keynote][1] (1 hour)
+2. [Writing efficient R functions][2] (1 hour)
+3. [S4 system for object-oriented programming][3] (2 hours)
+4. [Unit testing and R CMD check][4] (40 minutes)
+5. [Debugging][5] and [parallelization][6] (1 hour 30 minutes)
+
+[1]: ./Keynote.html
+[2]: ./EfficientR.html
+[3]: ./S4.html
+[4]: ./UnitTest.html
+[5]: ./Debug.html
+[6]: ./Parallel.html

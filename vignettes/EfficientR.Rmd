@@ -1,0 +1,376 @@
+---
+title: "Writing Efficient R Code"
+author: "Martin Morgan"
+date: "July 31 - August 1, 2018"
+vignette: >
+  %\VignetteIndexEntry{EfficientR}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document
+---
+
+# Introduction
+
+Actually, writing efficient _R_ code is *NOT* the first step! Instead
+
+1. Correct -- the code must first of all be correct.
+2. Robust -- ideally, the code is robust to user inputs and to 'edge
+   cases' such as zero-length inputs.
+3. Understandable -- The code should be understandable -- not too clever
+4. Efficient -- Ok, finally we might identify code that limits
+   performance.
+   
+## Correct
+
+Tools
+
+- `identical()`: exact equivalence between a function and the result
+- `all.equal()`: numerical equivalence, perhaps to a specific tolerance
+
+Example: approximate pi by evaluating the infinite sum by one with a
+large value of `m`.
+
+\begin{equation}
+\frac{\pi}{4} =  \lim_{m\to\infty}\sum_{n=0}^{m} \frac{(-1)^n}{2n+1}
+\end{equation}
+
+```{r}
+compute_pi <- function(m) {
+    s = 0
+    sign = 1
+    for (n in 0:m) {
+        s = s + sign / (2 * n + 1)
+        sign = -sign
+    }
+    4 * s
+}
+```
+
+```{r}
+(pi_approx <- compute_pi(1000000))
+identical(pi, pi_approx)
+all.equal(pi, pi_approx)
+all.equal(pi, pi_approx, tolerance = 1e-6)
+```
+
+## Robust
+
+Our code should handle 'edge cases' that arise in user analysis.
+
+```{r}
+fun <- function(n) {
+    sapply(1:n, sqrt)
+}
+```
+
+Apparently 'correct'
+
+```{r}
+identical(sqrt(1:5), fun(5))
+```
+
+But not robust to all input values
+
+```{r}
+identical(sqrt(numeric()), fun(0))
+fun(-1)
+```
+
+Problem? `1:n` produces an incorrect sequence when `n < 1`. 'Fix' the function using `seq_len()`?
+
+```{r}
+fun1 <- function(n) {
+    sapply(seq_len(n), sqrt)
+}
+```
+
+Still correct for some cases, but broken in the zero-length case
+
+```{r}
+identical(sqrt(1:5), fun1(5))
+identical(sqrt(numeric(0)), fun1(0))
+try(fun1(-1))
+```
+
+Problem? `sapply(numeric(), sqrt)` returns a list, instead of a zero-length numeric vector! Fix the problem using `vapply()`
+
+```{r}
+fun2 <- function(n) {
+    vapply(seq_len(n), sqrt, FUN.VALUE = numeric(1))
+}
+```
+
+```{r}
+identical(sqrt(1:5), fun2(5))
+identical(sqrt(numeric(0)), fun2(0))
+try(fun2(-1))
+```
+
+Use formal 'unit tests' to capture the expectations of a function (more later)
+
+```{r}
+library(testthat)
+
+test_that("fun2 is correct", {
+    expect_identical(sqrt(1:5), fun2(5))
+})
+
+test_that("fun2 is robust", {
+    expect_identical(numeric(0), fun2(0))
+    expect_error(fun2(-1))
+})
+```
+
+## Understandable
+
+It's frequently tempting to make code _more complicated_ to handle edge cases or special conditions.
+
+```{r}
+fun3 <- function(n) {
+    if (n >= 1) {
+        res <- numeric(n)
+        for (i in 1:n)
+            res[i] = sqrt(i)
+    } else if (n == 0) {
+        res <- numeric(0)
+    } else {
+        stop("'n' must be a non-negative integer")
+    }
+    
+    1 / res
+}
+```
+
+This code is hard to reason about -- each branch of the `if` has to be thought through, ensuring that the branch produces a result that can be used in subsequent lines. 'Cyclomatic complexity' measures how complicated a function is; we'd like to write functions with low cyclomatic complexity.
+
+```{r}
+library(cyclocomp)
+cyclocomp(fun3)
+cyclocomp(fun2)
+```
+
+Some calculations are intrinsically complicated. The best strategy is to break a complicated function with high cyclomatic complexity into separate functions with reduced cyclomatic complexity. Main benefits are:
+
+- Modularity enables reasoning about botht the simple functon and the
+  higher-level function, so that both functions are more likely to be correct.
+- Easy unit testing, and therefore more robust code.
+- Opportunity for re-use in similar scenarios
+
+## Efficient
+
+Avoid 'premature optimization' -- only worry about inefficient code that slows evaluation in a meaning way
+
+Use `Rprof()` to identify inefficient code.
+
+Use `system.time()` for initial timing
+
+Use [microbenchmark]`::microbenchmark()` for replicated timing
+
+# Case studies
+
+## Vectorization
+
+Problem: iteration (`for`, `lapply()`, `sapply()`, `vapply()`, `mapply()`, `apply()`, ...) on a vector with `n` elements invokes base _R_ functions `n` times. 
+
+Solution: Use a vectorized version that invokes the function once.
+
+Example:
+
+```{r}
+compute_pi0 <- function(m) {
+    s = 0
+    sign = 1
+    for (n in 0:m) {
+        s = s + sign / (2 * n + 1)
+        sign = -sign
+    }
+    4 * s
+}
+```
+
+```{r}
+compute_pi1 <- function(m) {
+    even <- seq(0, m, by = 2)
+    odd <- seq(1, m, by = 2)
+    s <- sum(1 / (2 * even + 1)) - sum(1 / (2 * odd + 1))
+    4 * s
+}
+```
+
+```{r}
+m <- 1e6
+all.equal(compute_pi0(m), compute_pi1(m))
+```
+
+```{r}
+m <- 1e6
+system.time(compute_pi0(m))
+system.time(compute_pi1(m))
+```
+
+```{r}
+library(microbenchmark)
+m <- 1e4
+result <- microbenchmark(
+    compute_pi0(m),
+    compute_pi0(m * 10),
+    compute_pi0(m * 100),
+    compute_pi1(m),
+    compute_pi1(m * 10),
+    compute_pi1(m * 100),
+    compute_pi1(m * 1000),
+    times = 20
+)
+result
+plot(result, log="y")
+```
+
+## Pre-allocate and fill
+
+Problem: 'growing' a vector can cause _R_ to repeatedly copy the existing short vector into the longer vector, slowing execution time.
+
+Solution: 'pre-allocate' a vector and fill it with values. `lapply()` and friends do this automatically and are simpler than `for` loops.
+
+```{r}
+memory_copy1 <- function(n) {
+    result <- numeric()
+    for (i in seq_len(n))
+        result <- c(result, 1/i)
+    result
+}
+```
+
+```{r}
+memory_copy2 <- function(n) {
+    result <- numeric()
+    for (i in seq_len(n))
+        result[i] <- 1 / i
+    result
+}
+```
+
+```{r}
+pre_allocate1 <- function(n) {
+    result <- numeric(n)
+    for (i in seq_len(n))
+        result[i] <- 1 / i
+    result
+}
+```
+
+```{r}
+pre_allocate2 <- function(n) {
+    vapply(seq_len(n), function(i) 1 / i, numeric(1))
+}
+```
+
+```{r}
+vectorized <- function(n) {
+    1 / seq_len(n)
+}
+```
+
+
+```{r}
+n <- 100
+identical(memory_copy1(n), memory_copy2(n))
+identical(memory_copy1(n), pre_allocate1(n))
+identical(memory_copy1(n), pre_allocate2(n))
+identical(memory_copy1(n), vectorized(n))
+```
+
+```{r}
+n <- 10000
+microbenchmark(
+    memory_copy1(n),
+    memory_copy1(n * 2),
+    memory_copy1(n * 4),
+    times = 1, unit = "relative"
+)
+
+microbenchmark(
+    memory_copy2(n),
+    memory_copy2(n * 2),
+    memory_copy2(n * 4),
+    times = 10, unit = "relative"
+)
+```
+
+```{r}
+n <- 10000
+microbenchmark(
+    memory_copy1(n),
+    memory_copy2(n),
+    pre_allocate1(n),
+    pre_allocate2(n),
+    vectorized(n),
+    times = 10, unit = "relative"
+)
+```
+
+```{r}
+cyclocomp(pre_allocate1)
+cyclocomp(pre_allocate2)
+```
+
+## Operations on vectors
+
+Problem: updating a data frame copies the entire data frame.
+
+Solution: operate on vectors, updating the data.frame with the final answer.
+
+Example: https://stackoverflow.com/questions/51056820
+
+```{r}
+n <- 1e4
+df <- data.frame(Index = 1:n, A = seq(10, by = 1, length.out = n))
+
+f1 <- function(df) {
+    ## constants
+    cost1 <- 3
+    cost2 <- 0.05
+    cost3 <- 50
+
+    ## update data.frame -- copies entire data frame each time!
+    df$S[1] <- cost1
+    for (j in 2:(n))
+        df$S[j] <- df$S[j - 1] - cost3 + df$S[j - 1] * cost2 / 12
+
+    ## return result
+    df
+}
+```
+
+```{r}
+.f2helper <- function(cost1, cost2, cost3, n) {
+    ## create the result vector separately
+    cost2 <- cost2 / 12   # 'hoist' common operations
+    result <- numeric(n)
+    result[1] <- cost1
+    for (j in 2:(n))
+        result[j] <- (1 + cost2) * result[j - 1] - cost3
+    result
+}
+
+f2 <- function(df) {
+    cost1 <- 3
+    cost2 <- 0.05
+    cost3 <- 50
+
+    ## update the data.frame once
+    df$S <- .f2helper(cost1, cost2, cost3, n)
+    df
+}
+```
+
+```{r}
+all.equal(f1(df), f2(df))
+```
+
+```{r}
+microbenchmark(
+    f1(df),
+    f2(df),
+    times = 5, unit = "relative"
+)
+```

@@ -1,0 +1,555 @@
+---
+title: "S4 Classes and Methods"
+author: "Martin Morgan"
+date: "July 31 - August 1, 2018"
+vignette: >
+  %\VignetteIndexEntry{S4}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document
+---
+
+# Object systems
+
+## S3
+
+- Class defined by presence of a 'class' attribute
+- Generic function defined by presence of `UseMethod()` as body.
+- Methods defined _on the generic_.
+
+- Loose class definition
+- Linear inheritance
+- Single dispatch
+- Generally, no distinction between 'user' interface and 'developer'
+  implementation
+
+## S4
+
+Formal...
+
+- ... class definition -- `setClass()`
+- ... generic definition -- `setGeneric()`
+- ... method definition -- `setMethod()`
+
+Benefits
+
+- Programatic access to class definition
+  - Complex data representations possible
+  - Encourages separation of user 'API' from developer implementation
+- Multiple inheritance
+- Multiple dispatch
+
+# Developing a class to represent gene sets
+
+What is a gene set?
+
+- A collection of gene symbols
+
+Simple representation
+
+```{r}
+sets <- list(
+    set1 = sample(letters, 7),
+    set2 = sample(LETTERS, 5)
+)
+```
+
+## An S3 class and methods
+
+```{r}
+s3sets <- sets
+class(s3sets) <- "gene_set"
+names(s3sets)
+lengths(s3sets)
+```
+
+```{r}
+print.gene_set <- function(x) {
+    cat(
+        "S3 class: ", class(x), "\n",
+        "names(): ", paste(names(x), collapse=" "), "\n",
+        "lengths(): ", paste(lengths(x), collapse=" "), "\n",
+        sep=""
+    )
+}
+```
+
+Not very robust
+
+```{r}
+s3sets$set1 <- sample(5)
+```
+
+# S4 class and methods: `data.frame`-like implementation
+
+## Class definition
+
+```{r}
+.GeneSetDf <- setClass(
+    "GeneSetDf",
+    slots = c(
+        gene = "character", 
+        set = "factor"
+    )
+)
+```
+
+- Formal definition. Discover it with
+
+    ```{r}
+    getClass("GeneSetDf")
+    ```
+
+- `slots` are like 'fields' in Java / C++. *Column-oriented*, rather than row-oriented.
+- `.GeneSetDf()` is a constructor that is useful for _developers_, but not usually for users. It takes arguments named after slots, e.g.,
+
+    ```{r}
+    .GeneSetDf(
+        gene = c("A", "B", "C", "D"),
+        set = factor(c("set1", "set1", "set1", "set2"))
+    )
+    ```
+
+## Accessors: ordinary functions
+
+```{r}
+.gene <- function(x)
+    slot(x, "gene")
+
+.set <- function(x)
+    slot(x, "set")
+```
+
+- Provide a layer to separate what the user interfaces with (`gene()`, `set()`) versus what the developer thinks is an efficient representation.
+- Could be a plain function, or a generic with methods
+
+Accessors as generics
+
+- Define the generic
+
+    ```{r}
+    setGeneric("gene", function(x) standardGeneric("gene"))
+    
+    setGeneric("set", function(x) standardGeneric("set"))
+    ```
+    
+- implement methods
+
+    ```{r}
+    setMethod("gene", "GeneSetDf", .gene)
+
+    setMethod("set", "GeneSetDf", .set)
+    ```
+
+- discover available methods
+
+    ```{r}
+    showMethods("gene")
+    
+    showMethods(classes = "GeneSetDf", where = .GlobalEnv)
+    ```
+
+## Validity
+
+- Class definitions ensure each slot contains the correct _type_ of data, but there are often other constraints, e.g., that `gene` and `set` are the same length. Write a function that tests the validity of the object. The contract is: return TRUE if valid, or a character vector describing how the object is not valid.
+
+    ```{r}
+    .GeneSetDf_validity <-
+        function(object)
+    {
+        msg <- NULL
+        
+        if (length(gene(object)) != length(set(object)))
+            msg <- c(msg, "length of 'gene' must equal length of 'set'")
+        
+        if (is.null(msg)) TRUE else msg
+    }
+    ```
+
+- Use `setValidity()` to associate the class with the function that tests its validity.
+
+    ```{r}
+    setValidity("GeneSetDf", .GeneSetDf_validity)
+    ```
+
+## A constructor for users
+
+- `.GeneSetDf()` exposes slots directly to the caller, but usually one wants to separate the 'implementation' details (i.e., slots) from the 'interface' seen by the user. So we write a user-facing constructor that provides convenient ways to create our object.
+- For instance, `GeneSetDf()` can be invoked with a list of named character vectors `GeneSetDf(list(set1 = letters[1:3], set2 = LETTERS[1:5}))` or with named arguments defining the gene set `GeneSetDf(set1 = letters[1:3], set2 = LETTERS[1:5])`.
+- This user-facing convenience does not influence the representation of the object.
+
+```{r}
+GeneSetDf <-
+    function(...)
+{
+    args <- list(...)
+
+    if (length(args) == 0L) {
+        args <- list(character())
+    } else if (length(args) == 1L && is(args, "list"))
+        args <- args[[1]]
+
+    .GeneSetDf(
+        gene = unlist(unname(args)),
+        set = factor(
+            rep(names(args), lengths(args)),
+            levels = names(args)
+        )
+    )
+}
+```
+
+## The `show,GeneSetDf-method`
+
+- A basic method describes how the object is printed. 
+- `show()` is an existing generic (see `getGeneric("show")`).
+- Since genomic data are usually large, we try to implement a `show()` method that is not overwhelmed by large data.
+
+```{r}
+setMethod(
+    "show", "GeneSetDf",
+    function(object)
+{
+    names <- levels(set(object))
+    lengths <- as.vector(table(set(object)))
+    cat("class: ", class(object), "\n",
+        "names(): ", paste(names, collapse = " "), "\n",
+        "lengths(): ", paste(lengths, collapse = " "), "\n",
+        sep = ""
+    )
+})
+```
+
+Here's our interface..
+
+```{r}
+gs <- GeneSetDf(sets)
+gs
+gene(gs)
+set(gs)
+```
+
+# S4 class and method: `list`-like implementation
+
+There is usually more than one way to represent data. Here's a different implementation based on lists. It's worth thinking about the pros and cons of this implementation. Since the implementation is a detail meaningful to the developer, it is possible to switch implementations _without_ changing the user-facing interface. We do not do this here.
+
+## Class definition
+
+- The `GeneSet` class is very simple -- it 'contains' (extends) `list`, i.e., the gene sets will be represented as lists of character vectors.
+
+```{r}
+.GeneSet <- setClass(
+    "GeneSet",
+    contains = "list"
+)
+```
+
+## Validity
+
+- We need to ensure that all elements of the list are `character()`, that all list elements are named, and that there are no identically named gene sets.
+
+```{r}
+.GeneSet_validity <- function(object) {
+    msg <- NULL
+
+    types <- vapply(object, is, logical(1), "character")
+    if (!all(types))
+        msg <- c(msg, "'GeneSet' members must be character()")
+
+    if (sum(nzchar(names(object))) != length(object))
+        msg <- c(msg, "Each 'GeneSet' must be named")
+
+    if (any(duplicated(names(object))))
+        msg <- c(msg, "'GeneSet' names must be unique")
+
+    if (is.null(msg)) TRUE else msg
+}
+
+setValidity("GeneSet", .GeneSet_validity)
+```
+
+## A constructor for users
+
+- Our user-facing contructor will accept either a list of gene sets, or a series of named arguments, each representing a gene set.
+
+```{r}
+GeneSet <-
+    function(...)
+{
+    args <- list(...)
+
+    if (length(args) == 1L && is(args[[1]], "list"))
+        args <- args[[1]]
+
+    .GeneSet(args)
+}
+```
+
+## The `show,GeneSet-method`
+
+- The `show,GeneSet-method` presents the data in the same way as the `show,GeneSetDf-method`.
+- The interface, from the user perspective, is the same between the two different classes. The implementation, from the developer perspective, is the same.
+
+```{r}
+setMethod(
+    "show", "GeneSet",
+    function(object)
+{
+    cat(
+        "class: ", class(object), "\n",
+        "names(): ", paste(names(object), collapse=" "), "\n",
+        "lengths(): ", paste(lengths(object), collapse=" "), "\n",
+        sep=""
+    )
+})
+```
+
+Here's our interface so far...
+
+```{r}
+GeneSet(sets)
+GeneSet(A = letters[1:4], B = LETTERS[1:3])
+gs <- GeneSet(sets)
+gs
+```
+
+## Subsetting and update: `[`, `[[`, `[<-`, `[[<-`
+
+```{r}
+setMethod(
+    "[", c("GeneSet", "ANY", "missing", "missing"),
+    function(x, i, j, ..., drop = TRUE)
+{
+    result <- callNextMethod()
+    result <- as(result, "GeneSet")
+    validObject(result)
+    result
+})
+```
+
+```{r}
+setReplaceMethod(
+    "[", signature = c("GeneSet", "ANY", "missing", "ANY"),
+    function(x, i, j, ..., value)
+{
+    if (length(i) != length(value))
+        stop("'GeneSet' replacement value length not equal to length(i)")
+    if (any(nzchar(names(value))) && !all(names(x)[i] == names(value)))
+        stop("'GeneSet' replacement names do not equal GeneSet names")
+
+    result <- callNextMethod()
+    validObject(result)
+    result
+})
+```
+
+```{r}
+setReplaceMethod(
+    "[[", signature = c("GeneSet", "ANY", "missing", "ANY"),
+    function(x, i, j, ..., value)
+{
+    result <- callNextMethod()
+    result <- as(result, "GeneSet")
+    validObject(result)
+    result
+})
+```
+
+## Coercion
+
+```{r}
+.GeneSet_as_data_frame <-
+    function(from)
+{
+    data.frame(
+        gene = unlist(unname(from)),
+        set = factor(
+            rep(names(from), lengths(from)), 
+            levels = names(from)
+        ),
+        stringsAsFactors = FALSE
+    )
+}
+
+setAs("GeneSet", "data.frame", .GeneSet_as_data_frame)
+
+as.data.frame.GeneSet <- 
+    function(x, row.names = NULL, optional = FALSE, ...)
+{
+    .GeneSet_as_data_frame(x)
+}
+```
+
+# Exercises
+
+1. Improve the `show()` method for `GeneSet` so that the first
+   several genes of the first several sets are displayed
+   
+    ```{r}
+    .select_some <-
+        function(x, n = 6)
+    {
+        if (length(x) > n)
+            x <- c(head(x, n - 1), "...")
+        paste(x, collapse = " ")
+    }
+    
+    setMethod(
+        "show", "GeneSet",
+        function(object)
+    {
+        cat(
+            "class: ", class(object), "\n",
+            "length(): ", length(object), "\n",
+            "names(): ", paste(names(object), collapse=" "), "\n",
+            "lengths(): ", paste(lengths(object), collapse=" "), "\n",
+            sep=""
+        )
+        for (i in seq_len(min(length(object), 6)))
+            cat(
+                '[["', names(object)[i], '"]]: ',
+                    .select_some(object[[i]]), "\n",
+                sep = ""
+            )
+        if (length(object) > 6)
+            cat("...\n")
+    })
+    ```
+
+2. Improve the `show()` method for `GeneSetDf` to print the first
+   several genes of the first several sets in a data.frame-like format,
+
+    ```
+    gene    set
+       a   set1
+       b   set1
+       c   set1
+     ...    ...
+       A   set2
+       B   set2
+       C   set2
+     ...    ...
+     ...    ...
+    ```
+
+3. Write `setAs()` methods to coerce a `GeneSetDf` to and from a `data.frame`
+
+    ```{r}
+    .GeneSetDf_as_data_frame <-
+        function(from)
+    {
+        data.frame(
+            gene = gene(from), set = set(from), 
+            stringsAsFactors = FALSE
+        )
+    }
+    
+    as.data.frame.GeneSetDf <- 
+        function(x, row.names = NULL, optional = FALSE, ...)
+    {
+        .GeneSetDf_as_data_frame(x)
+    }
+    
+    .data_frame_as_GeneSetDf <-
+        function(from)
+    {
+        GeneSetDf(split(from$gene, from$set))
+    }
+
+    setAs("data.frame", "GeneSet", .data_frame_as_GeneSetDf)
+    ```
+    
+4. Modify the `GeneSetDf()` constructor so that, when given a
+   `data.frame` with exactly two columns `gene` and `set`, it coerces
+   the `data.frame` to a `GeneSetDf`
+
+    ```{r}
+    GeneSetDf <-
+        function(...)
+    {
+        args <- list(...)
+        if (length(args) == 0L) {
+            args <- list(character())
+        } else if (length(args) == 1L && is.list(args)) {
+            args <- args[[1]]
+            test <- is.data.frame(args) && 
+                setequal(names(args), c("gene", "set"))
+            if (test)
+                args <- split(args$gene, args$set)
+        }
+
+        .GeneSetDf(
+            gene = unlist(args, use.names=FALSE),
+            set = factor(
+                rep(names(args), lengths(args)),
+                levels = names(args)
+            )
+        )
+    }
+    ```
+    
+5. With the changes in the previous exercises, how well does
+   `GeneSetDf()` work with the tidyverse?
+
+6. A common file format for gene sets is `gmt`. This file has one line for each gene set; entries on the line are separated by tabs. 
+
+   - The first element is the set identifier. 
+   - The second element a set description. 
+   - The third and remaining elements are the genes in the set.
+
+   Modify the `GeneSetDf` class to contain a 'description' column. It should contain a character vector with as many elements as there are genes in a set. Modify the `show()` method.
+   
+7. (Advanced) Write an `import()` method for importing gmt files to `GeneSetDf` objects. The `import()` method should be based on [rtracklayer]`::import()`. This requires that you create a light-weight class `GmtFile` and an `import,GmtFile-method` that reads the file to a `GeneSetDf` object.
+
+   Start by writing a stand-alone function that does the import
+   
+    ```{r}
+    .import_gmt_as_GeneSetDf <-
+        function(fname, ...)
+    {
+        raw <- readLines(fname)
+        sets <- strsplit(raw, "\t")
+        names <- vapply(sets, `[[`, character(1), 1)
+        descriptions <- vapply(sets, `[[`, character(1), 2)
+        genes <- lapply(sets, `[`, -(1:2))
+        names(genes) <- names
+        GeneSetDf(genes)
+    }
+    ```
+    
+   Debug the stand-alone function until it works
+  
+    ```{r}
+    .import_gmt_as_GeneSetDf("extdata/broad_chr_subset.gmt")
+    ```
+  
+   Wire this into the [rtracklayer][] infrastructure by defining a 'dispatch' class `GmtFile` that contains `RTLFile` ('rtracklayer file', defined in the [rtracklayer][] package).
+  
+    ```{r, message=FALSE}
+    library(rtracklayer)
+
+    .GmtFile <- setClass("GmtFile", contains = "RTLFile")
+    
+    GmtFile <-
+        function(con, ...)
+    {
+        .GmtFile(resource = con, ...)
+    }
+    ```
+   and an `import,GmtFile-method`
+   
+    ```{r}
+    setMethod("import", "GmtFile", function(con, format, txt, ...) {
+        .import_gmt_as_GeneSetDf(resource(con))
+    })
+    ```
+    
+   check out the result
+   
+    ```{r}
+    import("extdata/broad_chr_subset.gmt")
+    ```
+
+8. (Advanced) Revise either the `GeneSet()` or `GeneSetDf()` interface so that both `GeneSet()` and `GeneSetDf()` have exactly the same interface, even though the implementation differs.
+
+[rtracklayer]: https://bioconductor.org/packages/rtracklayer

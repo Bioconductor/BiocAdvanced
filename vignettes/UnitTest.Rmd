@@ -1,0 +1,269 @@
+---
+title: "Unit tests"
+author: "Martin Morgan"
+date: "July 31 - August 1, 2018"
+vignette: >
+  %\VignetteIndexEntry{Unit tests}
+  %\VignetteEngine{knitr::rmarkdown}
+output: 
+  BiocStyle::html_document
+---
+
+# Unit tests
+
+Contract: produce a vector of length `n`, where the `i`th element is `sqrt(i)`.
+
+```{r}
+fun <-
+    function(n)
+{
+    sapply(1:n, sqrt)
+}
+```
+
+The contract and our intentions lead to a series of expectations about how the function should work:
+
+1. `fun(3)` produces the same result as `sqrt(1:3)`
+2. `fun(0)` produces a zero-length numeric vector
+3. `fun(-1)` produces an error
+
+Often tested in an _ad hoc_ way during development
+
+```{r}
+fun(3)
+fun(-1)
+fun(0)
+```
+
+But it is often advantageous to write formal tests that can be easily run during function development and at a later date.
+
+These 'unit tests' should be quick to evaluate. They should be very specific in the code that they test. Collectively, tests should cover most of the code we write; this is easier when we write simple functions (i.e., with low cyclomatic complexity).
+
+## Test-driven development
+
+Some of the _ad hoc_ tests in the previous section fail. Our first impulse is to revise the function and try again. A better idea is to capture the tests in code that can be easily evaluated.
+
+```{r, eval=FALSE}
+library(testthat)
+test_that("fun() works as expected", {
+    expect_identical(sqrt(1:3), fun(3))
+    expect_identical(numeric(), fun(0))
+    expect_error(fun(-1))
+})
+```
+
+and then to revise the function so that the unit tests are now successful.
+
+## Exercise
+
+1. Create a package using [devtools][].
+
+    ```{r, eval = FALSE}
+    devtools::create("TestPackage")
+    ```
+    
+2. Edit a file `TestPackage/R/fun.R` to contain our function
+
+    ```{r}
+    fun <-
+        function(n)
+    {
+        sapply(1:n, sqrt)
+    }
+    ```
+        
+2. Add [testthat][] unit tests
+
+    ```{r, eval = FALSE}
+    devtools::use_testthat("TestPacakge")
+    ```
+    
+   This has consequences:
+   
+   - DESCRIPTION is modified to contain `Suggests: testthat`
+   - New directory `tests` and file `tests/testthat.R`
+   - `tests/testthat.R` evaluates all `tests/testthat/test_*.R` files
+   
+3. Add a `context()` and the unit tests above to a file
+   `tests/testthat/test_fun.R`
+   
+    ```{r, eval = FALSE}
+    context("fun")
+
+    test_that("fun() works as expected", {
+        expect_identical(sqrt(1:3), fun(3))
+        expect_identical(numeric(), fun(0))
+        expect_error(fun(-1))
+    })
+    ```
+        
+4. Test our package
+
+    ```{r, eval = FALSE}
+    devtools::test("TestPackage")
+    ```
+
+5. Update `R/fun.R` to address the failed tests
+
+    ```{r}
+    fun <-
+        function(n)
+    {
+        vapply(seq_len(n), sqrt, numeric(1))
+    }
+    ```
+    
+6. Re-run the tests
+
+    ```{r, eval = FALSE}
+    devtools::test("TestPacakge")
+    ```
+
+# Checking packages
+
+Packages are more than the functions defined in them; they contain information about licensing, dependencies, help pages, vignettes, etc. 
+
+## Exercises
+
+1. Add the following [roxygen2][] tag above `fun()` in `R/fun.R`
+
+    ```{r}
+    #' @export
+    fun <-
+        function(n)
+    {
+        vapply(seq_len(n), sqrt, numeric(1))
+    }
+    ```
+    
+2. Run `devtools::document("TestPackage")`. This creates the `NAMESPACE`
+   file that tells _R_ that the function `fun` is to be visible to
+   users of the pacakge. It also creates a skeleton documentation page
+   at `man/fun.Rd`. Take a look at the `NAMESPACE` and `fun.Rd` files
+
+3. Install the package
+
+    ```{r, eval = FALSE}
+    devtools::install("TestPackage")
+    ```
+    
+   In a **separate** _R_ session, it should now be possible to load
+   your package and use it's functionality
+   
+   ```{r, eval = FALSE}
+   library("TestPackage")
+   fun(3)
+   fun(0)
+   fun(-1)
+   ```
+   
+4. Back in the original session, ask [devtools][] to check your package
+
+    ```{r, eval=FALSE}
+    devtools::check("TestPackage")
+    ```
+    
+   There are several interesting things
+
+   - Checking a package is actually a two-step process: (1) build a
+     'tar' ball of the source code; and (2) check the tar ball.
+   - _R_ requires packages to have a license, but your package does
+     not have a recognized license
+   - _R_ requires documentation for exported functions, but your
+     function is not completely documented.
+   - The unit tests (actually, all files `tests/*.R`) were evaluated
+     as part of the check.
+
+## Tackle the problems identified by `check()`
+
+Update the DESCRIPTION file to have a valid license. Some suggestions (Google these to start learning about differences between them) are
+
+```{r}
+dir(R.home("share/licenses"))
+```
+
+Add additional roxygen tags to `R/fun.R`
+
+```{r}
+#' Create a vector of square roots
+#'
+#' @param n non-negative integer(1) number of elements to create.
+#'
+#' @return numeric(n) vector of square roots from 1 to n
+#'
+#' @examples
+#' fun(5)
+#'
+#' @export
+fun <-
+    function(n)
+{
+    vapply(seq_len(n), sqrt, numeric(1))
+}
+```
+
+Compile the documentation and review `man/fun.Rd`
+
+```{r, eval=FALSE}
+devtools::document()
+```
+
+Run `devtools::check()` to confirm that the problems with the license and documentation have been addressed.
+
+Add a unit test to `tests/testhat/test_fun.R` that expects an error when a vector of length not equal to 1 is used as an argument to `fun()`, so that
+
+```{r, eval = FALSE}
+fun(numeric())
+fun(1:3)
+```
+
+both produce errors. Run `devtools::test()` and confirm that these are NOT errors in the current code. Update `fun.R` so that the unit tests will pass, and run `devtools::test()` to confirm that the original tests and the new tests pass.
+
+Run `devtools::check()` to confirm that the package passes check.
+
+## From the command line
+
+[devtools][] is a very convenient package, but it actually provides functionality that is available in base _R_ and from the command line. Open a shell and navigate to the directory containing `TestPackage`. For instance, I have
+
+```
+~/tmp/latam$ tree TestPackage/
+TestPackage/
+├── DESCRIPTION
+├── man
+│   └── fun.Rd
+├── NAMESPACE
+├── R
+│   └── fun.R
+├── TestPackage.Rproj
+└── tests
+    ├── testthat
+    │   └── test_fun.R
+    └── testthat.R
+
+4 directories, 7 files
+```
+
+Build and check the package from the command line, using base _R_
+
+```
+~/tmp/latam$ R CMD build TestPackage 
+* checking for file 'TestPackage/DESCRIPTION' ... OK
+* preparing 'TestPackage':
+* checking DESCRIPTION meta-information ... OK
+* checking for LF line-endings in source and make files and shell scripts
+* checking for empty or unneeded directories
+* building 'TestPackage_0.0.0.9000.tar.gz'
+
+~/tmp/latam$ R CMD check TestPackage_0.0.0.9000.tar.gz 
+* using log directory '/home/mtmorgan/tmp/latam/TestPackage.Rcheck'
+* using R version 3.4.1 Patched (2017-09-07 r73217)
+* using platform: x86_64-pc-linux-gnu (64-bit)
+* using session charset: UTF-8
+...
+```
+
+[devtools][] is not perfect, in particular when building and checking packages with S4 classes; _R_ is always the final arbiter.
+
+[devtools]: https://cran.r-project.org/package=devtools
+[testthat]: https://cran.r-project.org/package=testthat
+[roxygen2]: https://cran.r-project.org/package=roxygen2
