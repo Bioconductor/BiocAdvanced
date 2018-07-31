@@ -164,7 +164,9 @@ Use `Rprof()` to identify inefficient code.
 
 Use `system.time()` for initial timing
 
-Use [microbenchmark]`::microbenchmark()` for replicated timing
+Use [microbenchmark][]`::microbenchmark()` for replicated timing
+
+[microbenchmark]: https://cran.r-project.org/package=microbenchmark
 
 # Case studies
 
