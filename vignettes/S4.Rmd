@@ -9,6 +9,12 @@ output:
   BiocStyle::html_document
 ---
 
+```{r style, echo = FALSE, results = 'asis'}
+knitr::opts_chunk$set(
+    eval=as.logical(Sys.getenv("KNITR_EVAL", "TRUE")),
+    cache=as.logical(Sys.getenv("KNITR_CACHE", "TRUE")))
+```
+
 # Object systems
 
 ## S3
@@ -39,9 +45,8 @@ Benefits
 - Multiple inheritance
 - Multiple dispatch
 
-# Developing a class to represent gene sets
 
-What is a gene set?
+Goal: develop a class to represent gene sets
 
 - A collection of gene symbols
 
@@ -54,24 +59,136 @@ sets <- list(
 )
 ```
 
-## An S3 class and methods
+# S3 classes and methods: motivation
 
-S3 classes are easy to create -- simply add the `class()` attribute to the object.
+Create a vector of 300 random normal deviates. These are of class `numeric`. `summary()` describes the vector.
+
+```{r}
+x <- rnorm(300)
+class(x)
+summary(x)
+```
+
+Create a second vector and coordinate with the first in a data.frame, an object of class `data.frame`. `summary()` describes the data.frame.
+
+```{r}
+y <- x + rnorm(300)
+df <- data.frame(x, y)
+class(df)
+summary(df)
+```
+
+Plot the relationship between x and y
+
+```{r}
+plot(x, y)
+```
+
+Plot the relationship between x and y using a formula. The formula is actually an object, with class `formula`.
+
+```{r}
+plot(y ~ x, df)
+class(y ~ x)
+```
+
+Fit a linear model relating y and x. The fit is an object of class `lm`. `summary()` displays an ANOVA table.
+
+```{r}
+fit <- lm(y ~ x, df)
+fit
+class(fit)
+summary(fit)
+```
+
+Add a regression line to the plot.
+
+```{r}
+plot(y ~ x, df)
+abline(fit, col = "red", lwd = 3)
+```
+
+Notice that we have encountered several different _classes_ (numeric vector, data.frame, formula, "lm") and that the same function `summary()`, `plot()`, and `print()` (we use `print()` implicitly, whenever _R_ displays the result of an expression evalauted on the command line) behave differently depending on the class of the first argument to the function. Look at the following
+
+```{r}
+summary
+plot
+print
+```
+
+and inspecting the code of `abline()` note that there is a call to `coef()`
+
+```{r}
+coef
+```
+
+All of these functions share the same body, with a call to `UseMethod()`. This indicates that they are _S3 generic_ functions. 
+
+`UseMethod()` signals to _R_ that it should look for a specific _S3 method_ (a function) to use. S3 defines a method as a function that has a name composed of the name of the generic function, a `.`, and the name of the class of the first argument to the generic function. Thus our use of `summary()` generic actually invoked
+
+- `summary.data.frame()`
+- `summary.lm()`
+- `summary.default()` (a special method, used when no other method matches).
+
+Methods are sometimes not visible to the user (they are not necessary exported from the NAMESPACE of the package in which they are defined). Discover available methods with `methods()`
+
+```{r}
+methods(plot)
+```
+
+and use `getAnywhere()` to see the definition of a method, e.g., `getAnywhere("plot.lm")`.
+
+A practical consequence of understanding methods is in navigating the help system.
+
+```{r, eval = FALSE}
+?plot
+```
+
+provides help on the generic `plot` (high-level functionality common to all plotting methods)
+
+```{r, eval = FALSE}
+?plot.lm
+```
+
+provides help on the `plot` method for `lm` objects.
+
+# Creating S3 classes and methods
+
+## Act 1
+
+Remember our gene sets
+
+```{r}
+sets
+```
+
+We can make this an S3 class simply by adding a class attribute. The output is modified to include the class attribute. Generics like `names()` and `lengths()` continue to work -- _R_ looks for an S3 method `names.gene_set` but does not find one, so uses the default method.
 
 ```{r}
 s3geneset <- sets
 class(s3geneset) <- "gene_set"
+sets
 names(s3geneset)
 lengths(s3geneset)
 ```
 
-S3 methods take a generic such as `print()` (we know it is an S3 generic because it has `UseMethod("print")` as the only content of it's body).
+Follow best practices and make a _constructor_ that will take arguments and create an object of class `gene_set`
 
 ```{r}
-print
+gene_set <- function(...) {
+    args <- list(...)            # make a list from separate arguments
+    class(args) <- "gene_set"    # provide a class attribute
+    args
+}
 ```
 
-and defining a new function `print.gene_set`; _R_ recognizes this form to indicate that `print.gene_set` is one of the 'next methods' that the `print()` function should look for when trying to print an object. _R_ will use `print.gene_set()` when the first argument to `print()` is an object with class `gene_set`.
+Here it is in action
+
+```{r}
+gs <- gene_set(set1 = letters[1:7], set2 = LETTERS[1:5])
+gs
+```
+
+Define a new method on the `print()` generic to provide a different display of the object. Create the method by simply writing a function `print.gene_set()`:
 
 ```{r}
 print.gene_set <- function(x) {
@@ -82,15 +199,124 @@ print.gene_set <- function(x) {
         sep=""
     )
 }
+```
 
-print(s3geneset)
+And check out the (implicit) outcome of invoking the `print` generic on our new method
+
+```{r}
+gs
+```
+
+One problem with our class is that `[`-subsetting returns a `list` rather than `gene_set`. `[` is a generic, so we can write a method for gene set. The signature of the method matches the signature of the generic, even though we will not use the `j` argument. The body of the function has a call to `NextMethod()`, which is S3's syntax for saying 'apply the generic to the next-best match', in this case the next-best match is the default subsetting method, so `result` is a list. 
+
+```{r}
+`[.gene_set` <- function(x, i, j, ..., drop = TRUE) {
+    result <- NextMethod()      # next-best method, `[.default`, returns a list
+    do.call("gene_set", result) # invoke the constructor with `result` as args
+}
+```
+
+Subsetting now returns a `gene_set`.
+
+```{r}
+gs[1]
+gs[ c("set2", "set1", "set2") ]
 ```
 
 Our implementation is not very robust, for instance the following breaks the expectation that genes in a set are represented by `character()` values.
 
 ```{r}
-s3geneset$set1 <- sample(5)
+gs1 <- gs
+gs1$set1 <- 1:5
 ```
+
+## Act 2
+
+The `tidyverse` is a very helpful way of tackling problems in data analysis. It emphasizes a data.frame-like class called a `tibble`, and the structuring of data into rectangular tables rather than more complicated representations like the lists-of-vectors representation in `sets`.
+
+A tidy representation of gene sets might be
+
+```{r, message=FALSE}
+library(tidyverse)
+tbl <- tibble(
+    gene = unlist(sets, use.names = FALSE),
+    set = rep(names(sets), lengths(sets))
+)
+tbl
+```
+
+The class of `tbl` illustrates that the S3 system supports a linear hierarchy of classes
+
+```{r}
+class(tbl)
+```
+
+Most generally, `tbl` is a `data.frame`. But at least some methods are implemented by specialized methods defined on the `tbl` class, and even more specialized methods on the `tbl_df` class.
+
+```{r}
+methods(class="tbl")
+methods(class="tbl_df")
+```
+
+Here's a constructor to make a tibble-based gene set; we make this class by further specializing the class of tibble
+
+```{r}
+gene_set_tbl <- function(...) {
+    args <- list(...)
+    tbl <- tibble(
+        gene = unlist(args, use.names = FALSE),
+        set = rep(names(args), lengths(args))
+    )
+    class(tbl) <- c("gene_set_tbl", class(tbl))  # subclass of 'tbl_df', ...
+    tbl
+}
+```
+
+Implement `names()`, `lengths()` and `print()` methods for our new class
+
+```{r}
+names.gene_set_tbl = function(x) {
+    unique(x$set)
+}
+    
+lengths.gene_set_tbl = function(x, use.names = TRUE) {
+    lengths <- as.vector(table(x$set))
+    if (use.names)
+        names(lengths) <- names(x)
+    lengths
+}
+    
+print.gene_set_tbl = function(x, ...) {
+    cat(
+        "class: ", class(x)[1], "\n",
+        "names(): ", paste(names(x), collapse=", "), "\n",
+        "lengths(): ", paste(lengths(x), collapse=", "), "\n",
+        sep=""
+    )
+}
+```
+
+and check out the 'API' (interface) to our new class
+
+```{r}
+gst <- gene_set_tbl(set1 = letters[1:7], set2 = LETTERS[1:5])
+gst
+names(gst)
+lengths(gst)
+```
+
+## Comment
+
+Note that the _interface_ is exactly the same as the `gene_set` class
+
+```{r}
+gs <- gene_set(set1 = letters[1:7], set2 = LETTERS[1:5])
+gs
+names(gs)
+lengths(gs)
+```
+
+even though the _implementation_ is completly different! This is a very important property -- the developer can choose an implementation that is appropriate for, e.g., computational efficiency, while exposing an interface that is convenient to use.
 
 # S4 class and methods: `data.frame`-like implementation
 
