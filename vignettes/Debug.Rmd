@@ -386,6 +386,6 @@ vapply(seq_len(5), function(i) {
 }, numeric(1))
 ```
 
-## Hanlding warnings
+## Handling warnings
 
 `withCallingHandlers()`
