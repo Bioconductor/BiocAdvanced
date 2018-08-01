@@ -153,7 +153,7 @@ provides help on the `plot` method for `lm` objects.
 
 # Creating S3 classes and methods
 
-## Act 1
+## Act 1: list-of-vectors representation
 
 Remember our gene sets
 
@@ -230,7 +230,7 @@ gs1 <- gs
 gs1$set1 <- 1:5
 ```
 
-## Act 2
+## Act 2: tidy representation
 
 The `tidyverse` is a very helpful way of tackling problems in data analysis. It emphasizes a data.frame-like class called a `tibble`, and the structuring of data into rectangular tables rather than more complicated representations like the lists-of-vectors representation in `sets`.
 
