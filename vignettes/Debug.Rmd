@@ -241,6 +241,28 @@ options(error = NULL)
 
 ## Debugging complicated situations
 
+Not all functions are exported from a package namespace. Debug non-exported functions using `:::` to specify the function, e.g.,
+
+```{r, eval = FALSE}
+debug(MyPackage:::f)
+```
+
+Functions can be defined inside other functions
+
+```{
+f1 <- function(i) {
+    f2 <- function(i) {
+        if (i == -3)
+            stop("nested oops")
+    }
+    i <- -i
+    f2(i)
+    i
+}
+```
+
+The nested function `f2()` cannot be debugged using `debug(f2)`, because it does not exist until the function `f2()` is evaluated. Use `options(error = recover)` instead.
+
 Look at the arguments to `trace()`, and its help page `?trace`.
 
 ```{r}
