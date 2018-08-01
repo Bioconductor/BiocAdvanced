@@ -15,7 +15,9 @@ knitr::opts_chunk$set(
     cache=as.logical(Sys.getenv("KNITR_CACHE", "TRUE")))
 ```
 
-Setup
+# Debugging
+
+Create a small series of functions, the innermost of which, `f()` creates an error on a particular condition.
 
 ```{r}
 f <- function(i) {
@@ -34,14 +36,16 @@ h <- function(i) {
 }
 ```
 
+Test our hierarchy
+
 ```{r, eval = FALSE}
 h(2)  # ok
 h(3)  # error
 ```
 
-## `browser()`
+## Debugging your own code
 
-Useful for debugging code you are writing
+Insert a `browser()` statement in code that you would like to debug
 
 ```{r}
 f1 <- f
@@ -54,50 +58,250 @@ f <- function(i) {
 }
 ```
 
-reset `f`
+Evaluate the command that causes the problem. When the `browser()` statement is encountered, you'll be at an interactive prompt.
+
+```{r, eval = FALSE}
+> h(3)
+Called from: f(i)
+Browse[1]> 
+```
+
+Check out the help page `?browser`. You are 'inside' `f()` just after the location of the `browser()` statement. You can evaluate most _R_ commands, e.g., `ls()` to see variables that are defined, and `i` to see the value of `i`. 
+
+```{r, eval = FALSE}
+Browse[1]> ls()
+debug at #3: i <- -i
+[1] "i"
+Browse[1]> i
+[1] 3
+```
+
+Use `n` to go to step through the code one line at a time, investigating as you go (use `get("n")` if you have a variable `n` that you would like to see the value of).
+
+```{r, eval = FALSE}
+Browse[1]> n # next command
+debug at #4: if (i == -3) stop("oops")
+Browse[1]> i
+[1] -3
+Browse[1]> 
+debug at #4: stop("oops")
+```
+
+Once you understand the problem, use `Q` to exit the browser session and return to the command line.
+
+```{r, eval = FALSE}
+Browse[1]> Q # stop the debugging session
+>
+```
+
+Now that we've figure out the problem, we could edit `f` and remove the browser statement. Let's instead reset `f` to the original version of the function.
 
 ```{r}
 f <- f1
 ```
 
-## `traceback()`
+## Where is the problem?
 
-Find where the problem is.
-
-```{r, eval = FALSE}
-h(3)
-traceback()
-```
-
-## `debug()` / `debugonce()`
-
-Useful for debugging other code
+Sometimes an error occurs from deep within your own code, or the code in a package, and it is not really clear what code is causing the error and where it is coming from. In our simple example, we might have forgotten that `h()` calls `g()` calls `f()`, so when we see
 
 ```{r, eval = FALSE}
-debugonce(f)
-h(3)
+> h(3)
+Error in f(i) : oops
 ```
 
-## `trace()`
-
-`debug()` on steroids
+we would not know how `f()` was being called, or even where (e.g., in what pacakge) `f()` is defined. Use `traceback()` to see the 'call stack', the sequence of nested function calls that lead from the command line to the error.
 
 ```{r, eval = FALSE}
-trace(f, quote(print(i)))
-vapply(seq_len(5), h, numeric(1))
+> traceback()
+4: stop("oops") at #3
+3: f(i) at #2
+2: g(i) at #2
+1: h(3)
 ```
 
-## `recover()`
+This says `h(3)` called `g(i)` called `f(i)`, which triggered an error.
 
-`options(error=recover)` / `options(error = NULL)`
+## Debugging a function without modifying the function body
 
-When it is not obvious where the error is occuring.
+Use `debug()` to debug a function. We enter the browser as soon as the function is called.
 
 ```{r, eval = FALSE}
-vapply(seq_len(5), h, numeric(1))
+> debug(f)
+> h(3)
+debugging in: f(i)
+debug at #1: {
+    i <- -i
+    if (i == -3) 
+        stop("oops")
+    i
+}
+Browse[2]> 
 ```
+
+Use `undebug(f)` to stop debugging. 
+
+```{r, eval = FALSE}
+undebug(f)
+```
+
+Alternatively, use `debugonce()`
+
+```{r, eval = FALSE}
+> debugonce(f)
+> h(3)
+debugging in: f(i)
+debug at #1: {
+    i <- -i
+    if (i == -3) 
+        stop("oops")
+    i
+}
+Browse[2]> Q
+> h(3)
+Error in f(i) : oops
+```
+
+## Debugging at any position in the call stack
+
+Use `recover()` to debug at different positions in the call stack. For instance, use this definition of `g()`
+
+```{r}
+g1 <- g
+g <- function(i) {
+    if (i == 1)    # bug
+        i = 3
+    f(i)
+}
+```
+
+There is now an error with `h(1)`. It occurs in `f()`, but the problem is in `g()`. We can explore this as
+
+```{r, eval = FALSE}
+> h(1)
+Error in f(i) : oops
+
+Enter a frame number, or 0 to exit
+
+1: h(1)
+2: #2: g(i)
+3: #4: f(i)
+
+Selection: 
+```
+
+The call stack shows that we've invoked `h(1)`, and we're expecting (with the correct code) for `f(i)` to be passed `i = 1`. Let's investigate by looking in the 'frame' (position in the call stack) where `f()` is invoked
+
+```{r, eval = FALSE}
+Selection: 3
+Called from: f(i)
+Browse[1]> ls()
+[1] "i"
+Browse[1]> i
+[1] -3
+```
+It seems like `i` has an unexpected value, so let's `c`ontinue code execution to get back to the frame browser, and look at `g()`
+
+Browse[1]> c
+
+Enter a frame number, or 0 to exit   
+
+1: h(1)
+2: #2: g(i)
+3: #4: f(i)
+
+Selection: 2
+Called from: g(i)
+Browse[1]> ls()
+[1] "i"
+Browse[1]> i
+[1] 3
+```
+
+Weird, by the time we have gone through `g()` to the point where it calls `f()`, the value of `i` has become 3! Remind ourselves of the definition of `g()`, realize our error, and quit the browser and recover sessions.
+
+```{r, eval = FALSE}
+Browse[1]> g
+function(i) {
+    if (i == 1)
+        i = 3
+    f(i)
+}
+<bytecode: 0xa0f4c78>
+Browse[1]> Q
+>
+```
+
+Reset the option `error=` to it's default (NULL) value
+
+```{r}
+options(error = NULL)
+```
+
+## Use `trace()` for complicated situations
+
+Look at the arguments to `trace()`, and its help page `?trace`.
+
+```{r}
+args(trace)
+```
+
+One can use trace just like debug by specifying `browser` as the `tracer=` argument.
+
+
+```{r, eval = FALSE}
+> trace(f, browser)
+[1] "f"
+> h()
+Tracing f(i) on entry 
+Called from: eval(expr, p)
+Browse[1]> 
+debug: {
+    i <- -i
+    if (i == -3) 
+        stop("oops")
+    i
+}
+Browse[2]> Q
+> untrace(f)
+```
+
+The `tracer=` argument can be an arbitrary expression, written in `quote()` so it is only evaluated when the tracer execute. Here we write a tracer that prints the value of `i` on function entry
+
+```{r, eval = FALSE}
+> vapply(seq_len(5), h, numeric(1))
+Tracing f(i) on entry 
+[1] 1
+Tracing f(i) on entry 
+[1] 2
+Tracing f(i) on entry 
+[1] 3
+Error in f(i) : oops
+```
+
+which helps to show that the error occurs when `i == 3`. Another tracer may only break into the browser when a particular condition is met
+
+```{r, eval = FALSE}
+> vapply(seq_len(5), h, numeric(1))
+Tracing f(i) on entry 
+Tracing f(i) on entry 
+Tracing f(i) on entry 
+Called from: eval(expr, p)
+Browse[1]> 
+debug: {
+    i <- -i
+    if (i == -3) 
+        stop("oops")
+    i
+}
+Browse[2]> Q
+> untrace(f)
+```
+
+Use the `signature=` argument to trace a particular S4 method.
 
 ## What about warnings?
+
+Sometimes we need to investigate why a warning occurs. Here's a modification to `f()` that throws a warning.
 
 ```{r}
 f1 <- f
@@ -107,17 +311,52 @@ f <- function(i) {
         warning("i is bad")
     i
 }
-```
-
-```{r, eval = FALSE}
-options(warn = 2)
-h(2)
 h(3)
 ```
 
-```{r}
-options(warn = 0)
-f <- f1
+The strategy here is make all warning errors by setting and `options()` (see `?options`; at the same time set the error handler to `recover`. Discover the error, quit the browser and recover sessions, and reset the options to their default values (`options(warn = 0, error = NULL)`).
+
+```{r, eval = FALSE}
+options(warn = 2, error = recover)
+> h(3)
+Error in f(i) : (converted from warning) i is bad
+
+Enter a frame number, or 0 to exit   
+
+1: h(3)
+2: #2: g(i)
+3: #2: f(i)
+4: #3: warning("i is bad")
+5: .signalSimpleWarning("i is bad", quote(f(i)))
+6: withRestarts({
+    .Internal(.signalCondition(simpleWarning(msg, call), msg
+7: withOneRestart(expr, restarts[[1]])
+8: doWithOneRestart(return(expr), restart)
+
+Selection: 3
+Called from: withOneRestart(expr, restarts[[1L]])
+Browse[1]> 
+
+Enter a frame number, or 0 to exit   
+
+1: h(3)
+2: #2: g(i)
+3: #2: f(i)
+4: #3: warning("i is bad")
+5: .signalSimpleWarning("i is bad", quote(f(i)))
+6: withRestarts({
+    .Internal(.signalCondition(simpleWarning(msg, call), msg
+7: withOneRestart(expr, restarts[[1]])
+8: doWithOneRestart(return(expr), restart)
+
+Selection: 3
+Called from: withOneRestart(expr, restarts[[1L]])
+Browse[2]> ls()
+[1] "i"
+Browse[2]> i
+[1] 3
+Browse[2]> Q
+options(warn = 0, error = NULL)
 ```
 
 # Handling unavoidable errors and warnings
