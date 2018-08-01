@@ -201,6 +201,7 @@ Browse[1]> i
 ```
 It seems like `i` has an unexpected value, so let's `c`ontinue code execution to get back to the frame browser, and look at `g()`
 
+```{r, eval=FALSE}
 Browse[1]> c
 
 Enter a frame number, or 0 to exit   
@@ -234,10 +235,11 @@ Browse[1]> Q
 Reset the option `error=` to it's default (NULL) value
 
 ```{r}
+g <- g1
 options(error = NULL)
 ```
 
-## Use `trace()` for complicated situations
+## Debugging complicated situations
 
 Look at the arguments to `trace()`, and its help page `?trace`.
 
@@ -268,6 +270,8 @@ Browse[2]> Q
 The `tracer=` argument can be an arbitrary expression, written in `quote()` so it is only evaluated when the tracer execute. Here we write a tracer that prints the value of `i` on function entry
 
 ```{r, eval = FALSE}
+> trace(f, quote( print(i) ))
+[1] "f"
 > vapply(seq_len(5), h, numeric(1))
 Tracing f(i) on entry 
 [1] 1
@@ -281,6 +285,8 @@ Error in f(i) : oops
 which helps to show that the error occurs when `i == 3`. Another tracer may only break into the browser when a particular condition is met
 
 ```{r, eval = FALSE}
+> trace(f, quote( if (i == 3) browser() ))
+[1] "f"
 > vapply(seq_len(5), h, numeric(1))
 Tracing f(i) on entry 
 Tracing f(i) on entry 
@@ -312,6 +318,7 @@ f <- function(i) {
     i
 }
 h(3)
+f <- f1
 ```
 
 The strategy here is make all warning errors by setting and `options()` (see `?options`; at the same time set the error handler to `recover`. Discover the error, quit the browser and recover sessions, and reset the options to their default values (`options(warn = 0, error = NULL)`).
@@ -361,20 +368,24 @@ options(warn = 0, error = NULL)
 
 # Handling unavoidable errors and warnings
 
-## `tryCatch()`
+## Continuing evaluation after an error
+
+`tryCatch()`
 
 ```{r}
-h <- function(i) {
+vapply(seq_len(5), function(i) {
     tryCatch({
-        g(i)
+        h(i)
     }, error = function(e) {
         warning(
-            "C'est la vie!\n",
-            "    error: ", conditionMessage(e)
+            "error in i = ", i,
+            "\n    error: ", conditionMessage(e)
         )
-        NA
+        NA  # use NA to represent error calculation
     })
-}
+}, numeric(1))
 ```
 
-## `withCallingHandlers()`
+## Hanlding warnings
+
+`withCallingHandlers()`
